@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
-const Navbar = () => {
+const Navbar = ({ token, onLogout }) => {
   const location = useLocation();
   const isActive = (path) => location.pathname === path;
   const [isScrolled, setIsScrolled] = useState(false);
@@ -67,15 +67,25 @@ const Navbar = () => {
 
         {/* Navigation Links */}
         <nav className="hidden items-center gap-8 md:flex">
-          <NavLink to="/" label="DASHBOARD" />
-          <NavLink to="/schedule" label="SCHEDULE" />
-          <NavLink to="/results" label="RESULTS" />
-          <NavItem label="SETTINGS" />
+          {token && (
+            <>
+              <NavLink to="/" label="DASHBOARD" />
+              <NavLink to="/schedule" label="SCHEDULE" />
+              <NavLink to="/results" label="RESULTS" />
+              <NavItem label="SETTINGS" />
+            </>
+          )}
           
           {/* Language Switcher (.lang-switch) */}
           <div className="ml-4 border-l border-white/10 pl-8">
             <button className="text-sm text-white/50 transition-all duration-200 hover:text-[#FFA317] hover:drop-shadow-[0_0_8px_rgba(245,201,106,0.6)]" style={{ fontFamily: 'Montserrat, sans-serif' }}>DE</button>
           </div>
+
+          {token && (
+            <button onClick={onLogout} className="group relative inline-block py-2 text-sm font-medium tracking-wide text-white/60 transition-colors duration-180 hover:text-red-500 ml-4">
+              LOGOUT
+            </button>
+          )}
         </nav>
       </div>
     </header>

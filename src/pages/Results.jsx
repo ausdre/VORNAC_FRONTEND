@@ -161,6 +161,27 @@ const Results = () => {
                               <span className="text-white/30 text-xs font-mono">{finding.id}</span>
                             </div>
                             <p className="text-white/60 text-sm mb-4 leading-relaxed">{finding.description}</p>
+                            
+                            {/* Impact Section */}
+                            {finding.impact && (
+                                <div className="mb-4 bg-white/5 p-3 rounded border border-white/5">
+                                    <h6 className="text-[#FFA317] text-xs font-bold uppercase mb-1 tracking-wider">Business Impact</h6>
+                                    <p className="text-white/70 text-sm">{finding.impact}</p>
+                                </div>
+                            )}
+
+                            {/* Recommendation Section */}
+                            {finding.recommendation && finding.recommendation.length > 0 && (
+                                <div className="mb-4">
+                                    <h6 className="text-green-400 text-xs font-bold uppercase mb-2 tracking-wider">Recommendation</h6>
+                                    <ul className="list-disc list-inside text-white/60 text-sm space-y-1">
+                                        {finding.recommendation.map((rec, idx) => (
+                                            <li key={idx}>{rec}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+
                             <div className="flex gap-6 text-xs text-white/40 font-mono border-t border-white/5 pt-3">
                               <span>CVSS: <span className="text-white/70">{finding.cvss_score}</span></span>
                               <span>Assets: <span className="text-white/70">{finding.affected_assets.length}</span></span>

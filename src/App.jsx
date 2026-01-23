@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import axios from 'axios';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import Pentest from './pages/Pentest';
@@ -6,16 +7,41 @@ import Results from './pages/Results';
 import Navbar from './Navbar';
 
 function Login({ setToken }) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const attemptLogin = async (username, password) => {
+    const params = new URLSearchParams();
+    params.append('username', username);
+    params.append('password', password);
+    return axios.post('http://localhost:8000/api/v1/auth/login', params);
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Bypass login for now (Development Mode)
-    // Akzeptiert jeden Input, um Zugriff zu gewähren
-    const dummyToken = 'vornac-bypass-token';
-    localStorage.setItem('access_token', dummyToken);
-    setToken(dummyToken);
+    setError(null);
+    setLoading(true);
+    try {
+      // Use the standard credentials enforced by the backend script
+      const response = await attemptLogin('admin@companya.com', 'password123');
+
+      const { access_token } = response.data;
+      
+      localStorage.setItem('access_token', access_token);
+      setToken(access_token);
+    } catch (error) {
+      console.error("Login failed", error);
+      let errorMessage = error.response?.data?.detail;
+      
+      if (!errorMessage) {
+        errorMessage = error.code === "ERR_NETWORK" 
+          ? "Server unreachable (Network Error). Is Docker running?"
+          : `Login failed: ${error.message}`;
+      }
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -33,28 +59,18 @@ function Login({ setToken }) {
           <p className="text-white/40 text-xs tracking-[0.3em] mt-3 uppercase">System Access</p>
         </div>
 
+        {error && (
+          <div className="mb-6 bg-red-500/10 border border-red-500/50 rounded p-3 text-red-400 text-xs font-mono">
+            {error}
+          </div>
+        )}
+
         <div className="space-y-6">
-          <div>
-            <label className="block text-xs font-bold text-[#FFA317] uppercase tracking-widest mb-2">Identity</label>
-            <input 
-              className="w-full bg-black/40 border border-white/10 rounded p-3 text-white focus:outline-none focus:border-[#FFA317] focus:shadow-[0_0_20px_rgba(255,163,23,0.15)] transition-all duration-300 placeholder-white/10 font-mono text-sm" 
-              placeholder="ENTER ID" 
-              value={email} 
-              onChange={e => setEmail(e.target.value)} 
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-[#FFA317] uppercase tracking-widest mb-2">Key</label>
-            <input 
-              className="w-full bg-black/40 border border-white/10 rounded p-3 text-white focus:outline-none focus:border-[#FFA317] focus:shadow-[0_0_20px_rgba(255,163,23,0.15)] transition-all duration-300 placeholder-white/10 font-mono text-sm" 
-              type="password" 
-              placeholder="ENTER KEY" 
-              value={password} 
-              onChange={e => setPassword(e.target.value)} 
-            />
-          </div>
-          <button className="w-full bg-[#FFA317] text-black font-bold uppercase tracking-widest p-4 rounded hover:bg-white hover:text-black hover:shadow-[0_0_30px_rgba(255,255,255,0.3)] transition-all duration-300 mt-4">
-            Initialize
+          <button 
+            disabled={loading}
+            className={`w-full bg-[#FFA317] text-black font-bold uppercase tracking-widest p-4 rounded hover:bg-white hover:text-black hover:shadow-[0_0_30px_rgba(255,255,255,0.3)] transition-all duration-300 mt-4 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            {loading ? 'AUTHENTICATING...' : 'INITIALIZE'}
           </button>
         </div>
       </form>
@@ -65,10 +81,15 @@ function Login({ setToken }) {
 function App() {
   const [token, setToken] = useState(localStorage.getItem('access_token'));
 
+  const handleLogout = () => {
+    localStorage.removeItem('access_token');
+    setToken(null);
+  };
+
   return (
     <Router>
       <div className="min-h-screen bg-[#02030a] flex flex-col">
-        <Navbar />
+        <Navbar token={token} onLogout={handleLogout} />
         {!token ? (
           <Login setToken={setToken} />
         ) : (
