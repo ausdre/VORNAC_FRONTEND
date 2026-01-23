@@ -197,6 +197,16 @@ const Results = () => {
     }
   };
 
+  const handleDownloadReport = (job) => {
+    // This function receives the complete pentest JSON data
+    // The PDF generator will be implemented here
+    console.log('Download Report - Full Pentest Data:', job);
+
+    // For now, log the complete JSON to console
+    // You can implement the PDF generator here
+    alert('PDF generation will be implemented. Check console for complete JSON data.');
+  };
+
   // Target List View
   if (!selectedTarget) {
     return (
@@ -617,6 +627,22 @@ const Results = () => {
                         </div>
                         <div className={`w-4 h-4 rounded-full ${getTrafficLightColor(report.summary.traffic_light)}`}></div>
                       </>
+                    )}
+
+                    {isCompleted && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDownloadReport(job);
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#FFA317] to-[#FF8C00] hover:from-[#FF8C00] hover:to-[#FFA317] text-white font-bold rounded-lg shadow-[0_0_15px_rgba(255,163,23,0.3)] hover:shadow-[0_0_25px_rgba(255,163,23,0.5)] transition-all duration-200 text-sm"
+                        title="Download PDF Report"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <span className="hidden sm:inline">Download Report</span>
+                      </button>
                     )}
 
                     <div className={`text-white/30 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
