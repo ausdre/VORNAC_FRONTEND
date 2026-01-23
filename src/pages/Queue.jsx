@@ -4,6 +4,7 @@ import axios from 'axios';
 const Queue = () => {
   const [activePentest, setActivePentest] = useState(null);
   const [scheduledQueue, setScheduledQueue] = useState([]);
+  const [editModal, setEditModal] = useState(null); // { scheduled, date, time }
 
   useEffect(() => {
     fetchQueue();
@@ -68,8 +69,114 @@ const Queue = () => {
     return `${minutes}m`;
   };
 
+  const handleEditSchedule = (scheduled) => {
+    const scheduledDate = new Date(scheduled.scheduledFor);
+    const dateStr = scheduledDate.toISOString().split('T')[0];
+    const timeStr = scheduledDate.toTimeString().slice(0, 5);
+
+    setEditModal({
+      scheduled: scheduled,
+      date: dateStr,
+      time: timeStr
+    });
+  };
+
+  const handleSaveSchedule = () => {
+    if (!editModal.date || !editModal.time) {
+      return;
+    }
+
+    const newScheduledFor = new Date(`${editModal.date}T${editModal.time}`);
+    const now = new Date();
+
+    if (newScheduledFor <= now) {
+      alert('Please select a future date and time');
+      return;
+    }
+
+    // Update the scheduled pentest in localStorage
+    const queue = JSON.parse(localStorage.getItem('pentest_queue') || '[]');
+    const updated = queue.map(item => {
+      if (item.id === editModal.scheduled.id) {
+        return {
+          ...item,
+          scheduledFor: newScheduledFor.toISOString()
+        };
+      }
+      return item;
+    });
+    localStorage.setItem('pentest_queue', JSON.stringify(updated));
+
+    setEditModal(null);
+    fetchQueue();
+  };
+
+  const handleCancelEdit = () => {
+    setEditModal(null);
+  };
+
   return (
     <div className="min-h-screen bg-[#02030a] p-8 pt-12">
+      {/* Edit Schedule Modal */}
+      {editModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={handleCancelEdit}>
+          <div className="bg-[#0a0b14] border border-white/20 rounded-xl p-8 max-w-lg mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-6">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#FFA317]/10 flex items-center justify-center">
+                <svg className="w-8 h-8 text-[#FFA317]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-2 text-center">Edit Schedule</h2>
+              <p className="text-white/60 text-center">
+                Target: <span className="text-white font-semibold">"{editModal.scheduled.target?.name || 'Unknown'}"</span>
+              </p>
+            </div>
+
+            <div className="space-y-6 mb-6">
+              {/* Date and Time Inputs */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-white/70 text-sm font-medium mb-2">Date</label>
+                  <input
+                    type="date"
+                    value={editModal.date}
+                    onChange={(e) => setEditModal({ ...editModal, date: e.target.value })}
+                    min={new Date().toISOString().split('T')[0]}
+                    className="w-full bg-[#02030a] border border-white/10 rounded-lg py-2.5 px-4 text-white focus:outline-none focus:border-[#FFA317] focus:ring-1 focus:ring-[#FFA317] transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-white/70 text-sm font-medium mb-2">Time</label>
+                  <input
+                    type="time"
+                    value={editModal.time}
+                    onChange={(e) => setEditModal({ ...editModal, time: e.target.value })}
+                    className="w-full bg-[#02030a] border border-white/10 rounded-lg py-2.5 px-4 text-white focus:outline-none focus:border-[#FFA317] focus:ring-1 focus:ring-[#FFA317] transition-colors"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleCancelEdit}
+                  className="flex-1 bg-white/5 hover:bg-white/10 text-white font-medium py-3 px-4 rounded-lg border border-white/10 hover:border-white/20 transition-all duration-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveSchedule}
+                  disabled={!editModal.date || !editModal.time}
+                  className={`flex-1 bg-gradient-to-r from-[#FFA317] to-[#FF8C00] hover:from-[#FF8C00] hover:to-[#FFA317] text-white font-bold py-3 px-4 rounded-lg shadow-[0_0_20px_rgba(255,163,23,0.3)] hover:shadow-[0_0_30px_rgba(255,163,23,0.5)] transition-all duration-200 ${(!editModal.date || !editModal.time) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-6xl mx-auto">
         <h1 className="text-3xl font-bold text-white mb-8 tracking-wide" style={{ fontFamily: 'Montserrat, sans-serif' }}>
           QUEUE
@@ -158,14 +265,31 @@ const Queue = () => {
                   className="bg-[#0a0b14] border border-white/10 rounded-xl p-6 shadow-lg hover:border-white/20 transition-all duration-300 relative group"
                 >
                   {/* Queue Position Badge */}
-                  <div className="absolute top-4 left-4 w-10 h-10 rounded-lg bg-[#FFA317]/20 border border-[#FFA317]/40 flex items-center justify-center">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-lg bg-[#FFA317]/20 border border-[#FFA317]/40 flex items-center justify-center">
                     <span className="text-[#FFA317] font-bold text-lg">#{index + 1}</span>
                   </div>
 
+                  {/* Edit Button */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEditSchedule(scheduled);
+                    }}
+                    className="absolute right-14 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-lg bg-[#FFA317]/10 hover:bg-[#FFA317]/20 text-[#FFA317] hover:text-[#FF8C00] border border-[#FFA317]/20 hover:border-[#FFA317]/40 transition-all duration-200 opacity-0 group-hover:opacity-100"
+                    title="Edit schedule"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </button>
+
                   {/* Delete Button */}
                   <button
-                    onClick={() => handleDeleteScheduled(scheduled.id)}
-                    className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 border border-red-500/20 hover:border-red-500/40 transition-all duration-200 opacity-0 group-hover:opacity-100"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteScheduled(scheduled.id);
+                    }}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 border border-red-500/20 hover:border-red-500/40 transition-all duration-200 opacity-0 group-hover:opacity-100"
                     title="Remove from queue"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
@@ -173,7 +297,7 @@ const Queue = () => {
                     </svg>
                   </button>
 
-                  <div className="ml-14">
+                  <div className="ml-16">
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                       {/* Target Info */}
                       <div className="md:col-span-2">
