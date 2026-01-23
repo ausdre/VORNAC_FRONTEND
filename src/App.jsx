@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
-import Pentest from './pages/Pentest';
+import NewPentest from './pages/NewPentest';
 import Results from './pages/Results';
+import Queue from './pages/Queue';
+import Settings from './pages/Settings';
 import Navbar from './Navbar';
 
 function Login({ setToken }) {
@@ -95,8 +97,10 @@ function App() {
         ) : (
           <Routes>
             <Route path="/" element={<Dashboard />} />
-            <Route path="/schedule" element={<Pentest />} />
+            <Route path="/schedule" element={<NewPentest />} />
+            <Route path="/queue" element={<Queue />} />
             <Route path="/results" element={<Results />} />
+            <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         )}

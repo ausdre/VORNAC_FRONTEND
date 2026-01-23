@@ -39,14 +39,6 @@ const Navbar = ({ token, onLogout }) => {
     );
   };
 
-  // Helper für statische Items (Reports, Settings)
-  const NavItem = ({ label }) => (
-    <span className="group relative inline-block cursor-pointer py-2 text-sm font-medium tracking-wide text-white/60 transition-colors duration-180 hover:text-white">
-      {label}
-      <span className="absolute left-0 -bottom-[2px] h-[1px] w-full origin-left scale-x-0 transform bg-gradient-to-br from-[#FFA317] to-[#FF8C00] transition-transform duration-180 ease-out group-hover:scale-x-100"></span>
-    </span>
-  );
-
   return (
     <header 
       id="site-header" 
@@ -69,22 +61,18 @@ const Navbar = ({ token, onLogout }) => {
         <nav className="hidden items-center gap-8 md:flex">
           {token && (
             <>
-              <NavLink to="/" label="DASHBOARD" />
-              <NavLink to="/schedule" label="SCHEDULE" />
+              <NavLink to="/" label="OVERVIEW" />
+              <NavLink to="/schedule" label="MANAGE" />
+              <NavLink to="/queue" label="QUEUE" />
               <NavLink to="/results" label="RESULTS" />
-              <NavItem label="SETTINGS" />
-            </>
-          )}
-          
-          {/* Language Switcher (.lang-switch) */}
-          <div className="ml-4 border-l border-white/10 pl-8">
-            <button className="text-sm text-white/50 transition-all duration-200 hover:text-[#FFA317] hover:drop-shadow-[0_0_8px_rgba(245,201,106,0.6)]" style={{ fontFamily: 'Montserrat, sans-serif' }}>DE</button>
-          </div>
+              <NavLink to="/settings" label="SETTINGS" />
 
-          {token && (
-            <button onClick={onLogout} className="group relative inline-block py-2 text-sm font-medium tracking-wide text-white/60 transition-colors duration-180 hover:text-red-500 ml-4">
-              LOGOUT
-            </button>
+              <div className="ml-4 border-l border-white/10 pl-8">
+                <button onClick={onLogout} className="group relative inline-block py-2 text-sm font-medium tracking-wide text-white/60 transition-colors duration-180 hover:text-red-500">
+                  LOGOUT
+                </button>
+              </div>
+            </>
           )}
         </nav>
       </div>

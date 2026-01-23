@@ -11,7 +11,7 @@ const client = axios.create({
 
 // Add JWT to every request if available
 client.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('access_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -39,6 +39,32 @@ export const createJob = async (inputData) => {
 
 export const getJobStatus = async (jobId) => {
   const response = await client.get(`/inference/${jobId}`);
+  return response.data;
+};
+
+export const deleteJob = async (jobId) => {
+  const response = await client.delete(`/inference/${jobId}`);
+  return response.data;
+};
+
+// Target endpoints
+export const getTargets = async () => {
+  const response = await client.get('/targets/');
+  return response.data;
+};
+
+export const getTarget = async (targetId) => {
+  const response = await client.get(`/targets/${targetId}`);
+  return response.data;
+};
+
+export const getTargetPentests = async (targetId) => {
+  const response = await client.get(`/targets/${targetId}/pentests`);
+  return response.data;
+};
+
+export const createTarget = async (targetData) => {
+  const response = await client.post('/targets/', targetData);
   return response.data;
 };
 

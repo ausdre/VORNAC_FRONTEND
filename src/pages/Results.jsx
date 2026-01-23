@@ -1,15 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { deleteJob } from '../api/client';
 
 const Results = () => {
   const [jobs, setJobs] = useState([]);
+  const [targets, setTargets] = useState([]);
+  const [selectedTarget, setSelectedTarget] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [expandedJob, setExpandedJob] = useState(null);
+  const [expandedPentest, setExpandedPentest] = useState(null);
+  const [deletePentestConfirm, setDeletePentestConfirm] = useState(null); // { id, name }
+  const [deleteAllConfirm, setDeleteAllConfirm] = useState(null); // { targetUrl, targetName }
+  const [searchQuery, setSearchQuery] = useState('');
+  const [errorModal, setErrorModal] = useState(null); // { message }
 
   useEffect(() => {
     fetchJobs();
-    // Polling alle 5 Sekunden für Updates
     const interval = setInterval(fetchJobs, 5000);
     return () => clearInterval(interval);
   }, []);
@@ -21,18 +27,21 @@ const Results = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
       setJobs(response.data);
+
+      // Group pentests by target URL
+      const grouped = groupPentestsByTarget(response.data);
+      setTargets(grouped);
+
       setLoading(false);
     } catch (err) {
       console.error("Failed to fetch jobs", err);
-      
-      // Wenn Token ungültig (401), ausloggen und neu laden
+
       if (err.response && err.response.status === 401) {
         localStorage.removeItem('access_token');
         window.location.reload();
         return;
       }
 
-      // Fehler nur setzen, wenn wir noch gar keine Daten haben
       if (jobs.length === 0) {
         setError("Could not load results. Please ensure the backend is running.");
       }
@@ -40,8 +49,133 @@ const Results = () => {
     }
   };
 
-  const toggleExpand = (jobId) => {
-    setExpandedJob(expandedJob === jobId ? null : jobId);
+  const groupPentestsByTarget = (pentests) => {
+    const targetMap = {};
+
+    // First, load all targets from localStorage
+    const savedTargets = JSON.parse(localStorage.getItem('pentest_targets') || '[]');
+    savedTargets.forEach(target => {
+      targetMap[target.url] = {
+        id: target.url,
+        name: target.name,
+        url: target.url,
+        description: target.description,
+        pentests: [],
+        pentest_count: 0,
+        findings: {
+          critical: 0,
+          high: 0,
+          medium: 0,
+          low: 0,
+          informational: 0,
+          total: 0
+        }
+      };
+    });
+
+    // Then, add pentests to targets
+    pentests.forEach(job => {
+      const targetUrl = job.input_data?.target || 'Unknown Target';
+      const targetName = job.result_data?.metadata?.client_name || job.input_data?.client || targetUrl;
+
+      if (!targetMap[targetUrl]) {
+        targetMap[targetUrl] = {
+          id: targetUrl,
+          name: targetName,
+          url: targetUrl,
+          pentests: [],
+          pentest_count: 0,
+          findings: {
+            critical: 0,
+            high: 0,
+            medium: 0,
+            low: 0,
+            informational: 0,
+            total: 0
+          }
+        };
+      }
+
+      targetMap[targetUrl].pentests.push(job);
+      targetMap[targetUrl].pentest_count += 1;
+
+      // Aggregate findings from completed pentests
+      if (job.status === 'COMPLETED' && job.result_data?.summary?.severity_breakdown) {
+        const breakdown = job.result_data.summary.severity_breakdown;
+        targetMap[targetUrl].findings.critical += breakdown.critical || 0;
+        targetMap[targetUrl].findings.high += breakdown.high || 0;
+        targetMap[targetUrl].findings.medium += breakdown.medium || 0;
+        targetMap[targetUrl].findings.low += breakdown.low || 0;
+        targetMap[targetUrl].findings.informational += breakdown.informational || 0;
+        targetMap[targetUrl].findings.total += job.result_data.summary.total_findings || 0;
+      }
+    });
+
+    return Object.values(targetMap);
+  };
+
+  const handleTargetClick = (target) => {
+    setSelectedTarget(target);
+    setExpandedPentest(null);
+  };
+
+  const handleBackToTargets = () => {
+    setSelectedTarget(null);
+    setExpandedPentest(null);
+  };
+
+  const toggleExpandPentest = (pentestId) => {
+    setExpandedPentest(expandedPentest === pentestId ? null : pentestId);
+  };
+
+  const handleDeletePentest = (pentest) => {
+    const pentestName = pentest.result_data?.metadata?.report_id || `Pentest ${pentest.id}`;
+    setDeletePentestConfirm({ id: pentest.id, name: pentestName });
+  };
+
+  const confirmDeletePentest = async () => {
+    try {
+      await deleteJob(deletePentestConfirm.id);
+      setDeletePentestConfirm(null);
+      // Refresh the jobs list
+      await fetchJobs();
+    } catch (error) {
+      console.error('Failed to delete pentest:', error);
+      setDeletePentestConfirm(null);
+      setErrorModal({ message: 'Failed to delete pentest. Please try again.' });
+    }
+  };
+
+  const cancelDeletePentest = () => {
+    setDeletePentestConfirm(null);
+  };
+
+  const handleDeleteAllPentests = (target) => {
+    setDeleteAllConfirm({ targetUrl: target.url, targetName: target.name, pentestCount: target.pentests.length });
+  };
+
+  const confirmDeleteAllPentests = async () => {
+    try {
+      const target = targets.find(t => t.url === deleteAllConfirm.targetUrl);
+      if (!target) return;
+
+      // Delete all pentests for this target
+      for (const pentest of target.pentests) {
+        await deleteJob(pentest.id);
+      }
+
+      setDeleteAllConfirm(null);
+      // Refresh the jobs list
+      await fetchJobs();
+    } catch (error) {
+      console.error('Failed to delete all pentests:', error);
+      setDeleteAllConfirm(null);
+      setErrorModal({ message: 'Failed to delete all pentests. Please try again.' });
+    }
+  };
+
+  const cancelDeleteAllPentests = () => {
+    setDeleteAllConfirm(null);
   };
 
   const getSeverityColor = (severity) => {
@@ -63,53 +197,428 @@ const Results = () => {
     }
   };
 
+  // Target List View
+  if (!selectedTarget) {
+    return (
+      <div className="min-h-screen bg-[#02030a] p-8 pt-12">
+        {/* Delete Single Pentest Modal */}
+        {deletePentestConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={cancelDeletePentest}>
+            <div className="bg-[#0a0b14] border border-white/20 rounded-xl p-8 max-w-md mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/10 flex items-center justify-center">
+                  <span className="text-3xl">⚠️</span>
+                </div>
+                <h2 className="text-2xl font-bold text-white mb-2">Delete Pentest?</h2>
+                <p className="text-white/60">
+                  Are you sure you want to delete <span className="text-white font-semibold">"{deletePentestConfirm.name}"</span>?
+                </p>
+                <p className="text-white/40 text-sm mt-2">This action cannot be undone.</p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={cancelDeletePentest}
+                  className="flex-1 bg-white/5 hover:bg-white/10 text-white font-medium py-3 px-4 rounded-lg border border-white/10 hover:border-white/20 transition-all duration-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDeletePentest}
+                  className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-4 rounded-lg shadow-[0_0_20px_rgba(239,68,68,0.3)] hover:shadow-[0_0_30px_rgba(239,68,68,0.5)] transition-all duration-200"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete All Pentests Modal */}
+        {deleteAllConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={cancelDeleteAllPentests}>
+            <div className="bg-[#0a0b14] border border-white/20 rounded-xl p-8 max-w-md mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/10 flex items-center justify-center">
+                  <span className="text-3xl">⚠️</span>
+                </div>
+                <h2 className="text-2xl font-bold text-white mb-2">Delete All Pentests?</h2>
+                <p className="text-white/60">
+                  Are you sure you want to delete <span className="text-white font-semibold">all {deleteAllConfirm.pentestCount} pentest(s)</span> from <span className="text-white font-semibold">"{deleteAllConfirm.targetName}"</span>?
+                </p>
+                <p className="text-white/40 text-sm mt-2">This action cannot be undone. The target will remain but all pentest results will be deleted.</p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={cancelDeleteAllPentests}
+                  className="flex-1 bg-white/5 hover:bg-white/10 text-white font-medium py-3 px-4 rounded-lg border border-white/10 hover:border-white/20 transition-all duration-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDeleteAllPentests}
+                  className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-4 rounded-lg shadow-[0_0_20px_rgba(239,68,68,0.3)] hover:shadow-[0_0_30px_rgba(239,68,68,0.5)] transition-all duration-200"
+                >
+                  Delete All
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Error Modal */}
+        {errorModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setErrorModal(null)}>
+            <div className="bg-[#0a0b14] border border-white/20 rounded-xl p-8 max-w-md mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/10 flex items-center justify-center">
+                  <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <h2 className="text-2xl font-bold text-white mb-2">Error</h2>
+                <p className="text-white/60">{errorModal.message}</p>
+              </div>
+              <button
+                onClick={() => setErrorModal(null)}
+                className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-4 rounded-lg shadow-[0_0_20px_rgba(239,68,68,0.3)] hover:shadow-[0_0_30px_rgba(239,68,68,0.5)] transition-all duration-200"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="max-w-6xl mx-auto">
+          <h1 className="text-3xl font-bold text-white mb-8 tracking-wide" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+            TARGETS
+          </h1>
+
+          {/* Search Field */}
+          <div className="mb-6">
+            <input
+              type="text"
+              placeholder="Search targets by name, URL, or description..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-[#0a0b14] border border-white/10 rounded-lg py-3 px-4 text-white placeholder-white/40 focus:outline-none focus:border-[#FFA317] focus:ring-1 focus:ring-[#FFA317] transition-colors"
+            />
+          </div>
+
+          {loading && targets.length === 0 && <p className="text-white/50 animate-pulse">Loading targets...</p>}
+          {error && <div className="bg-red-500/10 border border-red-500 text-red-400 p-4 rounded mb-6">{error}</div>}
+
+          {targets.length === 0 && !loading && (
+            <div className="bg-[#0a0b14] border border-white/10 rounded-xl p-8 text-center">
+              <p className="text-white/50 mb-4">No targets found. Create a pentest to get started.</p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {targets.filter(target => {
+              if (!searchQuery) return true;
+              const query = searchQuery.toLowerCase();
+              return (
+                target.name.toLowerCase().includes(query) ||
+                target.url.toLowerCase().includes(query) ||
+                (target.description && target.description.toLowerCase().includes(query))
+              );
+            }).map((target) => (
+              <div
+                key={target.id}
+                onClick={() => handleTargetClick(target)}
+                className="bg-[#0a0b14] border border-white/10 rounded-xl p-6 cursor-pointer hover:border-[#FFA317] transition-all duration-300 shadow-lg hover:shadow-[0_0_20px_rgba(255,163,23,0.3)] group flex flex-col"
+              >
+                {/* Header */}
+                <div className="mb-4">
+                  <h3 className="text-white font-bold text-xl mb-2 group-hover:text-[#FFA317] transition-colors">{target.name}</h3>
+                  <p className="text-white/50 text-sm font-mono break-all">{target.url}</p>
+                </div>
+
+                {/* Findings Breakdown */}
+                <div className="mb-4 flex-grow">
+                  <div className="grid grid-cols-5 gap-2">
+                    {target.findings.critical > 0 && (
+                      <div className="text-center">
+                        <div className="bg-red-500/20 text-red-500 rounded-lg py-2 px-1 font-bold text-sm border border-red-500/30">
+                          {target.findings.critical}
+                        </div>
+                        <span className="text-red-500/70 text-[10px] uppercase mt-1 block font-medium">Crit</span>
+                      </div>
+                    )}
+                    {target.findings.high > 0 && (
+                      <div className="text-center">
+                        <div className="bg-orange-500/20 text-orange-500 rounded-lg py-2 px-1 font-bold text-sm border border-orange-500/30">
+                          {target.findings.high}
+                        </div>
+                        <span className="text-orange-500/70 text-[10px] uppercase mt-1 block font-medium">High</span>
+                      </div>
+                    )}
+                    {target.findings.medium > 0 && (
+                      <div className="text-center">
+                        <div className="bg-yellow-500/20 text-yellow-500 rounded-lg py-2 px-1 font-bold text-sm border border-yellow-500/30">
+                          {target.findings.medium}
+                        </div>
+                        <span className="text-yellow-500/70 text-[10px] uppercase mt-1 block font-medium">Med</span>
+                      </div>
+                    )}
+                    {target.findings.low > 0 && (
+                      <div className="text-center">
+                        <div className="bg-blue-500/20 text-blue-500 rounded-lg py-2 px-1 font-bold text-sm border border-blue-500/30">
+                          {target.findings.low}
+                        </div>
+                        <span className="text-blue-500/70 text-[10px] uppercase mt-1 block font-medium">Low</span>
+                      </div>
+                    )}
+                    {target.findings.informational > 0 && (
+                      <div className="text-center">
+                        <div className="bg-gray-500/20 text-gray-400 rounded-lg py-2 px-1 font-bold text-sm border border-gray-500/30">
+                          {target.findings.informational}
+                        </div>
+                        <span className="text-gray-400/70 text-[10px] uppercase mt-1 block font-medium">Info</span>
+                      </div>
+                    )}
+                  </div>
+                  {target.findings.total === 0 && (
+                    <p className="text-white/30 text-xs text-center py-2">No findings yet</p>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="flex items-center justify-between pt-4 border-t border-white/5">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-[#FFA317]/20 text-[#FFA317] w-10 h-10 rounded-lg flex items-center justify-center font-bold text-lg">
+                      {target.pentest_count}
+                    </div>
+                    <span className="text-white/50 text-sm">
+                      {target.pentest_count === 1 ? 'Pentest' : 'Pentests'}
+                    </span>
+                  </div>
+                  <span className="text-[#FFA317] text-sm font-medium flex items-center gap-1">
+                    View <span className="group-hover:translate-x-1 transition-transform">→</span>
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Pentest List View (Drilldown)
+  const pentests = selectedTarget.pentests;
+
   return (
     <div className="min-h-screen bg-[#02030a] p-8 pt-12">
-      <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold text-white mb-8 tracking-wide" style={{ fontFamily: 'Montserrat, sans-serif' }}>OPERATION RESULTS</h1>
+      {/* Delete Single Pentest Modal */}
+      {deletePentestConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={cancelDeletePentest}>
+          <div className="bg-[#0a0b14] border border-white/20 rounded-xl p-8 max-w-md mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/10 flex items-center justify-center">
+                <span className="text-3xl">⚠️</span>
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-2">Delete Pentest?</h2>
+              <p className="text-white/60">
+                Are you sure you want to delete <span className="text-white font-semibold">"{deletePentestConfirm.name}"</span>?
+              </p>
+              <p className="text-white/40 text-sm mt-2">This action cannot be undone.</p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={cancelDeletePentest}
+                className="flex-1 bg-white/5 hover:bg-white/10 text-white font-medium py-3 px-4 rounded-lg border border-white/10 hover:border-white/20 transition-all duration-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeletePentest}
+                className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-4 rounded-lg shadow-[0_0_20px_rgba(239,68,68,0.3)] hover:shadow-[0_0_30px_rgba(239,68,68,0.5)] transition-all duration-200"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-        {loading && jobs.length === 0 && <p className="text-white/50 animate-pulse">Loading operations data...</p>}
-        {error && <div className="bg-red-500/10 border border-red-500 text-red-400 p-4 rounded mb-6">{error}</div>}
+      {/* Delete All Pentests Modal */}
+      {deleteAllConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={cancelDeleteAllPentests}>
+          <div className="bg-[#0a0b14] border border-white/20 rounded-xl p-8 max-w-md mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/10 flex items-center justify-center">
+                <span className="text-3xl">⚠️</span>
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-2">Delete All Pentests?</h2>
+              <p className="text-white/60">
+                Are you sure you want to delete <span className="text-white font-semibold">all {deleteAllConfirm.pentestCount} pentest(s)</span> from <span className="text-white font-semibold">"{deleteAllConfirm.targetName}"</span>?
+              </p>
+              <p className="text-white/40 text-sm mt-2">This action cannot be undone. The target will remain but all pentest results will be deleted.</p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={cancelDeleteAllPentests}
+                className="flex-1 bg-white/5 hover:bg-white/10 text-white font-medium py-3 px-4 rounded-lg border border-white/10 hover:border-white/20 transition-all duration-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteAllPentests}
+                className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-4 rounded-lg shadow-[0_0_20px_rgba(239,68,68,0.3)] hover:shadow-[0_0_30px_rgba(239,68,68,0.5)] transition-all duration-200"
+              >
+                Delete All
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error Modal */}
+      {errorModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setErrorModal(null)}>
+          <div className="bg-[#0a0b14] border border-white/20 rounded-xl p-8 max-w-md mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/10 flex items-center justify-center">
+                <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-2">Error</h2>
+              <p className="text-white/60">{errorModal.message}</p>
+            </div>
+            <button
+              onClick={() => setErrorModal(null)}
+              className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-4 rounded-lg shadow-[0_0_20px_rgba(239,68,68,0.3)] hover:shadow-[0_0_30px_rgba(239,68,68,0.5)] transition-all duration-200"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="max-w-6xl mx-auto">
+        {/* Back Button */}
+        <button
+          onClick={handleBackToTargets}
+          className="text-white/50 hover:text-[#FFA317] mb-6 flex items-center gap-2 transition-colors"
+        >
+          <span>←</span> Back to Targets
+        </button>
+
+        {/* Target Header */}
+        <div className="bg-[#0a0b14] border border-white/10 rounded-xl p-6 mb-8">
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex-1">
+              <h1 className="text-3xl font-bold text-white mb-2" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                {selectedTarget.name}
+              </h1>
+              <p className="text-white/50 font-mono">{selectedTarget.url}</p>
+              {selectedTarget.description && (
+                <p className="text-white/40 text-sm mt-4">{selectedTarget.description}</p>
+              )}
+            </div>
+            {pentests.length > 0 && (
+              <button
+                onClick={() => handleDeleteAllPentests(selectedTarget)}
+                className="bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 font-medium py-2 px-4 rounded-lg border border-red-500/20 hover:border-red-500/40 transition-all duration-200 text-sm whitespace-nowrap"
+              >
+                Delete All Pentests
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-4 pt-4 border-t border-white/5">
+            <div className="text-white/30 text-sm">
+              Total Pentests: <span className="text-[#FFA317] font-bold">{pentests.length}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Pentests List */}
+        <h2 className="text-xl font-bold text-white mb-4">Pentest History</h2>
+
+        {/* Search Field */}
+        <div className="mb-6">
+          <input
+            type="text"
+            placeholder="Search pentests by ID, status, or date..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-[#0a0b14] border border-white/10 rounded-lg py-3 px-4 text-white placeholder-white/40 focus:outline-none focus:border-[#FFA317] focus:ring-1 focus:ring-[#FFA317] transition-colors"
+          />
+        </div>
+
+        {pentests.length === 0 && (
+          <div className="bg-[#0a0b14] border border-white/10 rounded-xl p-8 text-center">
+            <p className="text-white/50">No pentests found for this target.</p>
+          </div>
+        )}
 
         <div className="space-y-6">
-          {jobs.map((job) => {
+          {pentests.filter(job => {
+            if (!searchQuery) return true;
+            const query = searchQuery.toLowerCase();
+            return (
+              job.id.toLowerCase().includes(query) ||
+              job.status.toLowerCase().includes(query) ||
+              (job.result_data?.metadata?.report_id && job.result_data.metadata.report_id.toLowerCase().includes(query)) ||
+              new Date(job.created_at).toLocaleString().toLowerCase().includes(query)
+            );
+          }).map((job) => {
             const isCompleted = job.status === 'COMPLETED';
             const report = job.result_data;
-            const isExpanded = expandedJob === job.id;
+            const isExpanded = expandedPentest === job.id;
 
             return (
-              <div key={job.id} className="bg-[#0a0b14] border border-white/10 rounded-xl overflow-hidden transition-all duration-300 hover:border-white/20 shadow-lg">
+              <div key={job.id} className="bg-[#0a0b14] border border-white/10 rounded-xl overflow-hidden transition-all duration-300 hover:border-white/20 shadow-lg relative group">
                 {/* Header Row */}
-                <div 
+                <div
                   className="p-6 flex items-center justify-between cursor-pointer bg-white/5 hover:bg-white/10 transition-colors"
-                  onClick={() => isCompleted && toggleExpand(job.id)}
+                  onClick={() => isCompleted && toggleExpandPentest(job.id)}
                 >
                   <div className="flex items-center gap-6">
                     <div className={`w-3 h-3 rounded-full ${isCompleted ? 'bg-green-500 shadow-[0_0_10px_#22c55e]' : 'bg-blue-500 animate-pulse'}`}></div>
                     <div>
                       <h3 className="text-white font-semibold text-lg">
-                        {report?.metadata?.client_name || job.input_data?.target || "Unknown Target"}
+                        {report?.metadata?.report_id || 'Pentest Report'}
                       </h3>
                       <p className="text-white/40 text-xs font-mono uppercase tracking-wider">{job.id}</p>
+                      <p className="text-white/30 text-xs mt-1">
+                        {new Date(job.created_at).toLocaleString()}
+                      </p>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-8">
-                    <div className="text-right">
-                      <p className="text-white/40 text-xs uppercase tracking-wider">Status</p>
+                    <div className="text-right flex flex-col justify-center">
+                      <p className="text-white/40 text-xs uppercase tracking-wider mb-1">Status</p>
                       <p className={`font-medium ${isCompleted ? 'text-green-400' : 'text-blue-400'}`}>{job.status}</p>
                     </div>
-                    
+
+                    {/* Delete Button between Status and Risk Score */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeletePentest(job);
+                      }}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 border border-red-500/20 hover:border-red-500/40 transition-all duration-200 opacity-0 group-hover:opacity-100"
+                      title="Delete pentest"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+
                     {isCompleted && report?.summary && (
                       <>
-                        <div className="text-right hidden sm:block">
-                          <p className="text-white/40 text-xs uppercase tracking-wider">Risk Score</p>
+                        <div className="text-right flex flex-col justify-center hidden sm:block">
+                          <p className="text-white/40 text-xs uppercase tracking-wider mb-1">Risk Score</p>
                           <p className="text-white font-bold text-xl">{report.summary.risk_score}</p>
                         </div>
                         <div className={`w-4 h-4 rounded-full ${getTrafficLightColor(report.summary.traffic_light)}`}></div>
                       </>
                     )}
-                    
+
                     <div className={`text-white/30 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
                       ▼
                     </div>
@@ -119,7 +628,6 @@ const Results = () => {
                 {/* Expanded Details */}
                 {isExpanded && isCompleted && report && (
                   <div className="p-8 border-t border-white/10 bg-[#05060a]">
-                    
                     {/* Summary Section */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
                       <div className="col-span-2">
@@ -161,36 +669,37 @@ const Results = () => {
                               <span className="text-white/30 text-xs font-mono">{finding.id}</span>
                             </div>
                             <p className="text-white/60 text-sm mb-4 leading-relaxed">{finding.description}</p>
-                            
+
                             {/* Impact Section */}
                             {finding.impact && (
-                                <div className="mb-4 bg-white/5 p-3 rounded border border-white/5">
-                                    <h6 className="text-[#FFA317] text-xs font-bold uppercase mb-1 tracking-wider">Business Impact</h6>
-                                    <p className="text-white/70 text-sm">{finding.impact}</p>
-                                </div>
+                              <div className="mb-4 bg-white/5 p-3 rounded border border-white/5">
+                                <h6 className="text-[#FFA317] text-xs font-bold uppercase mb-1 tracking-wider">Business Impact</h6>
+                                <p className="text-white/70 text-sm">{finding.impact}</p>
+                              </div>
                             )}
 
                             {/* Recommendation Section */}
                             {finding.recommendation && finding.recommendation.length > 0 && (
-                                <div className="mb-4">
-                                    <h6 className="text-green-400 text-xs font-bold uppercase mb-2 tracking-wider">Recommendation</h6>
-                                    <ul className="list-disc list-inside text-white/60 text-sm space-y-1">
-                                        {finding.recommendation.map((rec, idx) => (
-                                            <li key={idx}>{rec}</li>
-                                        ))}
-                                    </ul>
-                                </div>
+                              <div className="mb-4">
+                                <h6 className="text-green-400 text-xs font-bold uppercase mb-2 tracking-wider">Recommendation</h6>
+                                <ul className="list-disc list-inside text-white/60 text-sm space-y-1">
+                                  {finding.recommendation.map((rec, idx) => (
+                                    <li key={idx}>{rec}</li>
+                                  ))}
+                                </ul>
+                              </div>
                             )}
 
                             <div className="flex gap-6 text-xs text-white/40 font-mono border-t border-white/5 pt-3">
                               <span>CVSS: <span className="text-white/70">{finding.cvss_score}</span></span>
-                              <span>Assets: <span className="text-white/70">{finding.affected_assets.length}</span></span>
+                              {finding.affected_assets && (
+                                <span>Assets: <span className="text-white/70">{finding.affected_assets.length}</span></span>
+                              )}
                             </div>
                           </div>
                         ))}
                       </div>
                     </div>
-
                   </div>
                 )}
               </div>
