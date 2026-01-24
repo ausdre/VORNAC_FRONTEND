@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from './stores/authStore';
 import { migrateLegacyData } from './services/storage';
 import { migrateLocalStorageToBackend } from './utils/migrateToBackend';
@@ -10,6 +10,7 @@ import Results from './pages/Results';
 import Queue from './pages/Queue';
 import Settings from './pages/Settings';
 import Navbar from './Navbar';
+import AdminApp from './admin/AdminApp';
 
 function Login() {
   const { login } = useAuthStore();
@@ -102,26 +103,39 @@ function Login() {
   );
 }
 
-function App() {
+function AppContent() {
+  const location = useLocation();
   const { isAuthenticated, logout } = useAuthStore();
 
+  // Route to Admin App for /admin/* paths
+  if (location.pathname.startsWith('/admin')) {
+    return <AdminApp />;
+  }
+
+  // Regular app routes
+  return (
+    <div className="min-h-screen bg-[#02030a] flex flex-col">
+      <Navbar onLogout={logout} />
+      {!isAuthenticated ? (
+        <Login />
+      ) : (
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/schedule" element={<NewPentest />} />
+          <Route path="/queue" element={<Queue />} />
+          <Route path="/results" element={<Results />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      )}
+    </div>
+  );
+}
+
+function App() {
   return (
     <Router>
-      <div className="min-h-screen bg-[#02030a] flex flex-col">
-        <Navbar onLogout={logout} />
-        {!isAuthenticated ? (
-          <Login />
-        ) : (
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/schedule" element={<NewPentest />} />
-            <Route path="/queue" element={<Queue />} />
-            <Route path="/results" element={<Results />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="*" element={<Navigate to="/" />} />
-          </Routes>
-        )}
-      </div>
+      <AppContent />
     </Router>
   );
 }
