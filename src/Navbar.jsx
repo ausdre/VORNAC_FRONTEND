@@ -70,7 +70,7 @@ const Navbar = ({ onLogout }) => {
         <div className="flex items-center gap-4">
           <Link to="/" className="group flex items-center">
             {/* Die Animation des Logos ist jetzt an den Scroll-Zustand gekoppelt, genau wie auf der Website. */}
-            <img src="/V.svg" alt="VORNAC Logo" className={`w-auto drop-shadow-[0_0_10px_rgba(255,163,23,0.5)] transition-all duration-180 ${isScrolled ? 'h-8 scale-[.92]' : 'h-10 scale-100'}`} />
+            <img src="/vornac_static.svg" alt="VORNAC Logo" className={`w-auto drop-shadow-[0_0_10px_rgba(255,163,23,0.5)] transition-all duration-180 ${isScrolled ? 'h-6 scale-[.92]' : 'h-8 scale-100'}`} />
           </Link>
 
           {/* Tenant Badge */}

@@ -107,10 +107,11 @@ const AdminLogin = () => {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold mb-2" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-            VORNAC <span className="text-[#FFA317]">ADMIN</span>
-          </h1>
-          <p className="text-white/40 text-sm">Super Admin Access</p>
+          {/* VORNAC Logo */}
+          <div className="flex justify-center mb-4">
+            <img src="/vornac_static.svg" alt="VORNAC" className="h-16 w-auto drop-shadow-[0_0_20px_rgba(255,163,23,0.5)]" />
+          </div>
+          <p className="text-white/40 text-sm text-center">Super Admin Access</p>
         </div>
 
         {/* Step 1: Credentials */}

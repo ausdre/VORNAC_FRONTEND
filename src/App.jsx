@@ -79,9 +79,11 @@ function Login() {
 
       <form onSubmit={handleSubmit} className="relative z-10 bg-[#02030a]/60 backdrop-blur-xl p-10 rounded-2xl border border-white/5 shadow-2xl w-full max-w-md">
         <div className="text-center mb-10">
-          <h1 className="text-4xl font-bold text-white tracking-wider mb-2" style={{ fontFamily: 'Montserrat, sans-serif' }}>VORNAC</h1>
-          <div className="h-0.5 w-16 bg-[#FFA317] mx-auto shadow-[0_0_15px_rgba(255,163,23,0.5)]"></div>
-          <p className="text-white/40 text-xs tracking-[0.3em] mt-3 uppercase">System Access</p>
+          {/* VORNAC Logo */}
+          <div className="flex justify-center mb-4">
+            <img src="/vornac_static.svg" alt="VORNAC" className="h-16 w-auto drop-shadow-[0_0_20px_rgba(255,163,23,0.5)]" />
+          </div>
+          <p className="text-white/40 text-xs tracking-[0.3em] uppercase">System Access</p>
         </div>
 
         {error && (
