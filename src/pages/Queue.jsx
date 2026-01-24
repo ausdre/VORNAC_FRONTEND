@@ -1,18 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useAuthStore } from '../stores/authStore';
+import { getQueueItems, updateQueueItem, deleteQueueItem } from '../api/queue';
 
 const Queue = () => {
   const [activePentest, setActivePentest] = useState(null);
   const [scheduledQueue, setScheduledQueue] = useState([]);
   const [editModal, setEditModal] = useState(null); // { scheduled, date, time }
 
+  const { user } = useAuthStore();
+  const tenantId = user?.tenantId;
+
   useEffect(() => {
+    if (!tenantId) return;
+
     fetchQueue();
     const interval = setInterval(fetchQueue, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [tenantId]);
 
   const fetchQueue = async () => {
+    if (!tenantId) return;
+
     try {
       const token = localStorage.getItem('access_token');
 
@@ -25,8 +34,8 @@ const Queue = () => {
       const active = jobs.find(j => j.status === 'PENDING' || j.status === 'PROCESSING');
       setActivePentest(active || null);
 
-      // Fetch scheduled pentests from localStorage
-      const queue = JSON.parse(localStorage.getItem('pentest_queue') || '[]');
+      // Fetch scheduled pentests from backend API
+      const queue = await getQueueItems();
       const pending = queue
         .filter(s => s.status === 'pending')
         .sort((a, b) => {
@@ -36,7 +45,7 @@ const Queue = () => {
           if (aPriority !== bPriority) {
             return aPriority - bPriority;
           }
-          return new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime();
+          return new Date(a.scheduled_for).getTime() - new Date(b.scheduled_for).getTime();
         })
         .slice(0, 50); // Limit to next 50 tests
 
@@ -46,11 +55,15 @@ const Queue = () => {
     }
   };
 
-  const handleDeleteScheduled = (scheduledId) => {
-    const queue = JSON.parse(localStorage.getItem('pentest_queue') || '[]');
-    const updated = queue.filter(s => s.id !== scheduledId);
-    localStorage.setItem('pentest_queue', JSON.stringify(updated));
-    fetchQueue();
+  const handleDeleteScheduled = async (scheduledId) => {
+    if (!tenantId) return;
+
+    try {
+      await deleteQueueItem(scheduledId);
+      fetchQueue();
+    } catch (error) {
+      console.error('Failed to delete queue item:', error);
+    }
   };
 
   const formatTimeRemaining = (scheduledFor) => {
@@ -70,7 +83,7 @@ const Queue = () => {
   };
 
   const handleEditSchedule = (scheduled) => {
-    const scheduledDate = new Date(scheduled.scheduledFor);
+    const scheduledDate = new Date(scheduled.scheduled_for);
     const dateStr = scheduledDate.toISOString().split('T')[0];
     const timeStr = scheduledDate.toTimeString().slice(0, 5);
 
@@ -81,10 +94,12 @@ const Queue = () => {
     });
   };
 
-  const handleSaveSchedule = () => {
+  const handleSaveSchedule = async () => {
     if (!editModal.date || !editModal.time) {
       return;
     }
+
+    if (!tenantId) return;
 
     const newScheduledFor = new Date(`${editModal.date}T${editModal.time}`);
     const now = new Date();
@@ -94,21 +109,17 @@ const Queue = () => {
       return;
     }
 
-    // Update the scheduled pentest in localStorage
-    const queue = JSON.parse(localStorage.getItem('pentest_queue') || '[]');
-    const updated = queue.map(item => {
-      if (item.id === editModal.scheduled.id) {
-        return {
-          ...item,
-          scheduledFor: newScheduledFor.toISOString()
-        };
-      }
-      return item;
-    });
-    localStorage.setItem('pentest_queue', JSON.stringify(updated));
+    try {
+      // Update the scheduled pentest via backend API
+      await updateQueueItem(editModal.scheduled.id, {
+        scheduled_for: newScheduledFor.toISOString()
+      });
 
-    setEditModal(null);
-    fetchQueue();
+      setEditModal(null);
+      fetchQueue();
+    } catch (error) {
+      console.error('Failed to update queue item:', error);
+    }
   };
 
   const handleCancelEdit = () => {
@@ -129,7 +140,7 @@ const Queue = () => {
               </div>
               <h2 className="text-2xl font-bold text-white mb-2 text-center">Edit Schedule</h2>
               <p className="text-white/60 text-center">
-                Target: <span className="text-white font-semibold">"{editModal.scheduled.target?.name || 'Unknown'}"</span>
+                Target: <span className="text-white font-semibold">"{editModal.scheduled.target_data?.name || 'Unknown'}"</span>
               </p>
             </div>
 
@@ -302,25 +313,25 @@ const Queue = () => {
                       {/* Target Info */}
                       <div className="md:col-span-2">
                         <p className="text-white/40 text-xs uppercase tracking-wider mb-1">Target</p>
-                        <p className="text-white font-semibold text-lg">{scheduled.target?.name || 'Unknown'}</p>
-                        <p className="text-white/50 text-sm font-mono mt-1">{scheduled.target?.url || 'Unknown'}</p>
+                        <p className="text-white font-semibold text-lg">{scheduled.target_data?.name || 'Unknown'}</p>
+                        <p className="text-white/50 text-sm font-mono mt-1">{scheduled.target_data?.url || 'Unknown'}</p>
                       </div>
 
                       {/* Scheduled Date/Time */}
                       <div>
                         <p className="text-white/40 text-xs uppercase tracking-wider mb-1">Scheduled For</p>
                         <p className="text-[#FFA317] font-bold text-lg">
-                          {new Date(scheduled.scheduledFor).toLocaleDateString()}
+                          {new Date(scheduled.scheduled_for).toLocaleDateString()}
                         </p>
                         <p className="text-[#FFA317] text-sm">
-                          {new Date(scheduled.scheduledFor).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {new Date(scheduled.scheduled_for).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </p>
                       </div>
 
                       {/* Time Remaining */}
                       <div>
                         <p className="text-white/40 text-xs uppercase tracking-wider mb-1">Starting In</p>
-                        <p className="text-white font-semibold text-lg">{formatTimeRemaining(scheduled.scheduledFor)}</p>
+                        <p className="text-white font-semibold text-lg">{formatTimeRemaining(scheduled.scheduled_for)}</p>
                         {scheduled.priority === 0 && (
                           <span className="inline-block mt-1 px-2 py-0.5 bg-[#FFA317]/20 border border-[#FFA317]/40 text-[#FFA317] text-xs font-bold rounded">
                             IMMEDIATE

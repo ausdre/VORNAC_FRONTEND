@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
+import { getQueueItems } from '../api/queue';
 
 const Dashboard = () => {
   const [stats, setStats] = useState({
@@ -37,11 +38,11 @@ const Dashboard = () => {
         // Set active pentest
         setActivePentest(active || null);
 
-        // Get scheduled pentests from queue
-        const queue = JSON.parse(localStorage.getItem('pentest_queue') || '[]');
+        // Get scheduled pentests from queue API
+        const queue = await getQueueItems();
         const pendingQueue = queue
           .filter(s => s.status === 'pending')
-          .sort((a, b) => new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime());
+          .sort((a, b) => new Date(a.scheduled_for).getTime() - new Date(b.scheduled_for).getTime());
         setNextScheduled(pendingQueue[0] || null);
 
         // Calculate total findings from completed reports
@@ -154,12 +155,12 @@ const Dashboard = () => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
                   <p className="text-white/40 text-xs uppercase tracking-wider mb-1">Target</p>
-                  <p className="text-white font-semibold">{nextScheduled.target?.name || 'Unknown'}</p>
-                  <p className="text-white/50 text-sm font-mono">{nextScheduled.target?.url || 'Unknown'}</p>
+                  <p className="text-white font-semibold">{nextScheduled.target_data?.name || 'Unknown'}</p>
+                  <p className="text-white/50 text-sm font-mono">{nextScheduled.target_data?.url || 'Unknown'}</p>
                 </div>
                 <div>
                   <p className="text-white/40 text-xs uppercase tracking-wider mb-1">Scheduled For</p>
-                  <p className="text-[#FFA317] font-semibold">{new Date(nextScheduled.scheduledFor).toLocaleString()}</p>
+                  <p className="text-[#FFA317] font-semibold">{new Date(nextScheduled.scheduled_for).toLocaleString()}</p>
                 </div>
                 <div>
                   <p className="text-white/40 text-xs uppercase tracking-wider mb-1">Status</p>

@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { deleteJob } from '../api/client';
+import { useAuthStore } from '../stores/authStore';
+import { getTargets } from '../api/targets';
 
 const Results = () => {
   const [jobs, setJobs] = useState([]);
@@ -13,6 +15,9 @@ const Results = () => {
   const [deleteAllConfirm, setDeleteAllConfirm] = useState(null); // { targetUrl, targetName }
   const [searchQuery, setSearchQuery] = useState('');
   const [errorModal, setErrorModal] = useState(null); // { message }
+
+  const { user } = useAuthStore();
+  const tenantId = user?.tenantId;
 
   useEffect(() => {
     fetchJobs();
@@ -29,7 +34,7 @@ const Results = () => {
       setJobs(response.data);
 
       // Group pentests by target URL
-      const grouped = groupPentestsByTarget(response.data);
+      const grouped = await groupPentestsByTarget(response.data);
       setTargets(grouped);
 
       setLoading(false);
@@ -49,29 +54,33 @@ const Results = () => {
     }
   };
 
-  const groupPentestsByTarget = (pentests) => {
+  const groupPentestsByTarget = async (pentests) => {
     const targetMap = {};
 
-    // First, load all targets from localStorage
-    const savedTargets = JSON.parse(localStorage.getItem('pentest_targets') || '[]');
-    savedTargets.forEach(target => {
-      targetMap[target.url] = {
-        id: target.url,
-        name: target.name,
-        url: target.url,
-        description: target.description,
-        pentests: [],
-        pentest_count: 0,
-        findings: {
-          critical: 0,
-          high: 0,
-          medium: 0,
-          low: 0,
-          informational: 0,
-          total: 0
-        }
-      };
-    });
+    // First, load all targets from backend API
+    try {
+      const savedTargets = await getTargets();
+      savedTargets.forEach(target => {
+        targetMap[target.url] = {
+          id: target.url,
+          name: target.name,
+          url: target.url,
+          description: target.description,
+          pentests: [],
+          pentest_count: 0,
+          findings: {
+            critical: 0,
+            high: 0,
+            medium: 0,
+            low: 0,
+            informational: 0,
+            total: 0
+          }
+        };
+      });
+    } catch (error) {
+      console.error('Failed to fetch targets:', error);
+    }
 
     // Then, add pentests to targets
     pentests.forEach(job => {

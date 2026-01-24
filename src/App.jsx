@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { useAuthStore } from './stores/authStore';
+import { migrateLegacyData } from './services/storage';
+import { migrateLocalStorageToBackend } from './utils/migrateToBackend';
 import Dashboard from './pages/Dashboard';
 import NewPentest from './pages/NewPentest';
 import Results from './pages/Results';
@@ -8,35 +11,54 @@ import Queue from './pages/Queue';
 import Settings from './pages/Settings';
 import Navbar from './Navbar';
 
-function Login({ setToken }) {
+function Login() {
+  const { login } = useAuthStore();
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
-
-  const attemptLogin = async (username, password) => {
-    const params = new URLSearchParams();
-    params.append('username', username);
-    params.append('password', password);
-    return axios.post('http://localhost:8000/api/v1/auth/login', params);
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    try {
-      // Use the standard credentials enforced by the backend script
-      const response = await attemptLogin('admin@companya.com', 'password123');
 
+    try {
+      const params = new URLSearchParams();
+      params.append('username', 'admin@companya.com');
+      params.append('password', 'password123');
+
+      const response = await axios.post('http://localhost:8000/api/v1/auth/login', params);
       const { access_token } = response.data;
-      
-      localStorage.setItem('access_token', access_token);
-      setToken(access_token);
+
+      // Zustand login
+      const success = login(access_token);
+
+      if (success) {
+        // Legacy localStorage cleanup + Migration
+        localStorage.setItem('access_token', access_token); // Für Axios interceptor (backward compatibility)
+
+        const { user } = useAuthStore.getState();
+        if (user?.tenantId) {
+          // Phase 1: Migrate legacy keys to tenant-scoped localStorage
+          migrateLegacyData(user.tenantId);
+
+          // Phase 2: Migrate tenant-scoped localStorage to backend (async, non-blocking)
+          migrateLocalStorageToBackend(user.tenantId).then(result => {
+            if (result.success && !result.alreadyMigrated) {
+              console.log('Backend migration successful:', result);
+            }
+          }).catch(err => {
+            console.error('Backend migration error:', err);
+          });
+        }
+      } else {
+        setError('Failed to authenticate. Invalid token.');
+      }
     } catch (error) {
       console.error("Login failed", error);
       let errorMessage = error.response?.data?.detail;
-      
+
       if (!errorMessage) {
-        errorMessage = error.code === "ERR_NETWORK" 
+        errorMessage = error.code === "ERR_NETWORK"
           ? "Server unreachable (Network Error). Is Docker running?"
           : `Login failed: ${error.message}`;
       }
@@ -81,19 +103,14 @@ function Login({ setToken }) {
 }
 
 function App() {
-  const [token, setToken] = useState(localStorage.getItem('access_token'));
-
-  const handleLogout = () => {
-    localStorage.removeItem('access_token');
-    setToken(null);
-  };
+  const { isAuthenticated, logout } = useAuthStore();
 
   return (
     <Router>
       <div className="min-h-screen bg-[#02030a] flex flex-col">
-        <Navbar token={token} onLogout={handleLogout} />
-        {!token ? (
-          <Login setToken={setToken} />
+        <Navbar onLogout={logout} />
+        {!isAuthenticated ? (
+          <Login />
         ) : (
           <Routes>
             <Route path="/" element={<Dashboard />} />

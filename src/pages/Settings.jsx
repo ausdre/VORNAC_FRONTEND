@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { useAuthStore } from '../stores/authStore';
 
 const Settings = () => {
   const [currentPassword, setCurrentPassword] = useState('');
@@ -8,8 +9,9 @@ const Settings = () => {
   const [modalState, setModalState] = useState(null); // { type: 'success'|'error', message }
   const [loading, setLoading] = useState(false);
 
-  // Get user info from localStorage or token
-  const userEmail = 'admin@companya.com'; // In a real app, this would come from JWT or API
+  // Get user info from Zustand store
+  const { user } = useAuthStore();
+  const userEmail = user?.email || 'Unknown';
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
@@ -145,14 +147,14 @@ const Settings = () => {
               <div>
                 <label className="block text-white/40 text-xs uppercase tracking-wider mb-2">Role</label>
                 <div className="bg-[#02030a] border border-white/10 rounded-lg py-3 px-4 text-white">
-                  Administrator
+                  {user?.role || 'Unknown'}
                 </div>
               </div>
 
               <div>
                 <label className="block text-white/40 text-xs uppercase tracking-wider mb-2">Organization</label>
                 <div className="bg-[#02030a] border border-white/10 rounded-lg py-3 px-4 text-white">
-                  Company A
+                  {user?.tenantName || 'Unknown'}
                 </div>
               </div>
             </div>
