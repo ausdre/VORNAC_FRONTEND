@@ -8,7 +8,9 @@ import {
   createTenant,
   updateTenant,
   deleteTenant,
-  regenerateTenantAPIKey
+  regenerateTenantAPIKey,
+  suspendTenant,
+  unsuspendTenant
 } from '../api/tenants';
 
 const TenantsPage = () => {
@@ -22,6 +24,9 @@ const TenantsPage = () => {
   const [selectedTenant, setSelectedTenant] = useState(null);
   const [formData, setFormData] = useState({ name: '' });
   const [error, setError] = useState('');
+  const [showSuspendModal, setShowSuspendModal] = useState(false);
+  const [selectedTenantForSuspend, setSelectedTenantForSuspend] = useState(null);
+  const [suspendReason, setSuspendReason] = useState('');
 
   const fetchTenants = async () => {
     setLoading(true);
@@ -77,6 +82,42 @@ const TenantsPage = () => {
     } catch (err) {
       alert('Failed to delete tenant');
     }
+  };
+
+  const handleSuspend = async () => {
+    if (!suspendReason.trim()) {
+      alert('Please provide a suspension reason');
+      return;
+    }
+    try {
+      await suspendTenant(selectedTenantForSuspend.id, suspendReason);
+      setShowSuspendModal(false);
+      setSuspendReason('');
+      setSelectedTenantForSuspend(null);
+      fetchTenants();
+      alert(`Tenant "${selectedTenantForSuspend.name}" has been suspended`);
+    } catch (err) {
+      alert('Failed to suspend tenant');
+    }
+  };
+
+  const handleUnsuspend = async (tenant) => {
+    if (!confirm(`Unsuspend tenant "${tenant.name}"? Users will regain access immediately.`)) {
+      return;
+    }
+    try {
+      await unsuspendTenant(tenant.id);
+      fetchTenants();
+      alert(`Tenant "${tenant.name}" has been reactivated`);
+    } catch (err) {
+      alert('Failed to unsuspend tenant');
+    }
+  };
+
+  const openSuspendModal = (tenant) => {
+    setSelectedTenantForSuspend(tenant);
+    setSuspendReason('');
+    setShowSuspendModal(true);
   };
 
   const handleRegenerateAPIKey = async (tenant) => {
@@ -143,6 +184,7 @@ const TenantsPage = () => {
             <thead className="bg-white/5">
               <tr>
                 <th className="text-left p-4 text-white/60 text-sm font-bold">Name</th>
+                <th className="text-left p-4 text-white/60 text-sm font-bold">Status</th>
                 <th className="text-left p-4 text-white/60 text-sm font-bold">API Key</th>
                 <th className="text-left p-4 text-white/60 text-sm font-bold">Users</th>
                 <th className="text-right p-4 text-white/60 text-sm font-bold">Actions</th>
@@ -150,32 +192,69 @@ const TenantsPage = () => {
             </thead>
             <tbody className="divide-y divide-white/5">
               {tenants.map((tenant) => (
-                <tr key={tenant.id} className="hover:bg-white/5">
+                <tr key={tenant.id} className={`hover:bg-white/5 ${!tenant.is_active ? 'opacity-60' : ''}`}>
                   <td className="p-4 font-medium text-white">{tenant.name}</td>
+                  <td className="p-4">
+                    {tenant.is_active ? (
+                      <span className="px-2 py-1 bg-green-500/10 text-green-400 text-xs font-bold rounded">Active</span>
+                    ) : (
+                      <div>
+                        <span className="px-2 py-1 bg-red-500/10 text-red-400 text-xs font-bold rounded">Suspended</span>
+                        {tenant.suspension_reason && (
+                          <div className="text-xs text-white/40 mt-1">{tenant.suspension_reason}</div>
+                        )}
+                      </div>
+                    )}
+                  </td>
                   <td className="p-4 font-mono text-sm text-white/60">
                     {maskAPIKey(tenant.api_key)}
                   </td>
                   <td className="p-4 text-white/60">{tenant.user_count}</td>
                   <td className="p-4">
                     <div className="flex justify-end gap-2">
-                      <button
-                        onClick={() => openEditModal(tenant)}
-                        className="px-3 py-1 text-sm text-blue-400 hover:bg-blue-400/10 rounded"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleRegenerateAPIKey(tenant)}
-                        className="px-3 py-1 text-sm text-yellow-400 hover:bg-yellow-400/10 rounded"
-                      >
-                        Regen Key
-                      </button>
-                      <button
-                        onClick={() => handleDelete(tenant)}
-                        className="px-3 py-1 text-sm text-red-400 hover:bg-red-400/10 rounded"
-                      >
-                        Delete
-                      </button>
+                      {tenant.is_active ? (
+                        <>
+                          <button
+                            onClick={() => openEditModal(tenant)}
+                            className="px-3 py-1 text-sm text-blue-400 hover:bg-blue-400/10 rounded"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleRegenerateAPIKey(tenant)}
+                            className="px-3 py-1 text-sm text-yellow-400 hover:bg-yellow-400/10 rounded"
+                          >
+                            Regen Key
+                          </button>
+                          <button
+                            onClick={() => openSuspendModal(tenant)}
+                            className="px-3 py-1 text-sm text-orange-400 hover:bg-orange-400/10 rounded"
+                          >
+                            Suspend
+                          </button>
+                          <button
+                            onClick={() => handleDelete(tenant)}
+                            className="px-3 py-1 text-sm text-red-400 hover:bg-red-400/10 rounded"
+                          >
+                            Delete
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => handleUnsuspend(tenant)}
+                            className="px-3 py-1 text-sm text-green-400 hover:bg-green-400/10 rounded"
+                          >
+                            Unsuspend
+                          </button>
+                          <button
+                            onClick={() => handleDelete(tenant)}
+                            className="px-3 py-1 text-sm text-red-400 hover:bg-red-400/10 rounded"
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -265,6 +344,55 @@ const TenantsPage = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Suspend Modal */}
+      {showSuspendModal && selectedTenantForSuspend && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-[#0a0b14] border border-white/10 rounded-xl p-8 w-full max-w-md">
+            <h2 className="text-xl font-bold text-white mb-4">Suspend Tenant</h2>
+            <div className="mb-4 p-3 bg-orange-500/10 border border-orange-500/20 rounded">
+              <p className="text-orange-400 text-sm font-bold">Warning: This will immediately block all users from "{selectedTenantForSuspend.name}"</p>
+            </div>
+            {error && (
+              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded text-red-500 text-sm">
+                {error}
+              </div>
+            )}
+            <div className="mb-6">
+              <label className="block text-white/60 text-sm mb-2">Suspension Reason *</label>
+              <textarea
+                value={suspendReason}
+                onChange={(e) => setSuspendReason(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder:text-white/40 focus:border-[#FFA317] focus:outline-none"
+                placeholder="e.g., Payment overdue, Terms of Service violation, etc."
+                rows={3}
+                required
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSuspendModal(false);
+                  setSuspendReason('');
+                  setSelectedTenantForSuspend(null);
+                }}
+                className="flex-1 px-4 py-2 border border-white/20 text-white rounded hover:bg-white/5"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSuspend}
+                disabled={!suspendReason.trim()}
+                className="flex-1 px-4 py-2 bg-orange-500 text-white font-bold rounded hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Suspend Tenant
+              </button>
+            </div>
           </div>
         </div>
       )}

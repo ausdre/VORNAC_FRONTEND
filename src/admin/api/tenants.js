@@ -53,3 +53,19 @@ export const regenerateTenantAPIKey = async (tenantId) => {
 export const deleteTenant = async (tenantId) => {
   await adminClient.delete(`/tenants/${tenantId}`);
 };
+
+/**
+ * Suspend tenant
+ */
+export const suspendTenant = async (tenantId, reason) => {
+  const response = await adminClient.post(`/tenants/${tenantId}/suspend`, { reason });
+  return response.data;
+};
+
+/**
+ * Unsuspend tenant
+ */
+export const unsuspendTenant = async (tenantId) => {
+  const response = await adminClient.post(`/tenants/${tenantId}/unsuspend`);
+  return response.data;
+};
