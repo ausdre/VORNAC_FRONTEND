@@ -22,7 +22,7 @@ const TenantsPage = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState(null);
-  const [formData, setFormData] = useState({ name: '' });
+  const [formData, setFormData] = useState({ name: '', pentest_limit_per_year: '' });
   const [error, setError] = useState('');
   const [showSuspendModal, setShowSuspendModal] = useState(false);
   const [selectedTenantForSuspend, setSelectedTenantForSuspend] = useState(null);
@@ -49,9 +49,14 @@ const TenantsPage = () => {
     e.preventDefault();
     setError('');
     try {
-      await createTenant(formData);
+      // Format the payload - convert empty string to null for optional integer field
+      const payload = {
+        name: formData.name,
+        pentest_limit_per_year: formData.pentest_limit_per_year === '' ? null : parseInt(formData.pentest_limit_per_year)
+      };
+      await createTenant(payload);
       setShowCreateModal(false);
-      setFormData({ name: '' });
+      setFormData({ name: '', pentest_limit_per_year: '' });
       fetchTenants();
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to create tenant');
@@ -62,10 +67,15 @@ const TenantsPage = () => {
     e.preventDefault();
     setError('');
     try {
-      await updateTenant(selectedTenant.id, formData);
+      // Format the payload - convert empty string to null for optional integer field
+      const payload = {
+        name: formData.name,
+        pentest_limit_per_year: formData.pentest_limit_per_year === '' ? null : parseInt(formData.pentest_limit_per_year)
+      };
+      await updateTenant(selectedTenant.id, payload);
       setShowEditModal(false);
       setSelectedTenant(null);
-      setFormData({ name: '' });
+      setFormData({ name: '', pentest_limit_per_year: '' });
       fetchTenants();
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to update tenant');
@@ -135,7 +145,10 @@ const TenantsPage = () => {
 
   const openEditModal = (tenant) => {
     setSelectedTenant(tenant);
-    setFormData({ name: tenant.name });
+    setFormData({
+      name: tenant.name,
+      pentest_limit_per_year: tenant.pentest_limit_per_year || ''
+    });
     setShowEditModal(true);
   };
 
@@ -152,7 +165,7 @@ const TenantsPage = () => {
         </h1>
         <button
           onClick={() => {
-            setFormData({ name: '' });
+            setFormData({ name: '', pentest_limit_per_year: '' });
             setError('');
             setShowCreateModal(true);
           }}
@@ -187,6 +200,7 @@ const TenantsPage = () => {
                 <th className="text-left p-4 text-white/60 text-sm font-bold">Status</th>
                 <th className="text-left p-4 text-white/60 text-sm font-bold">API Key</th>
                 <th className="text-left p-4 text-white/60 text-sm font-bold">Users</th>
+                <th className="text-left p-4 text-white/60 text-sm font-bold">Pentest Limit</th>
                 <th className="text-right p-4 text-white/60 text-sm font-bold">Actions</th>
               </tr>
             </thead>
@@ -210,6 +224,13 @@ const TenantsPage = () => {
                     {maskAPIKey(tenant.api_key)}
                   </td>
                   <td className="p-4 text-white/60">{tenant.user_count}</td>
+                  <td className="p-4 text-white/60">
+                    {tenant.pentest_limit_per_year ? (
+                      <span>{tenant.pentest_limit_per_year}/year</span>
+                    ) : (
+                      <span className="text-white/40 italic">Unlimited</span>
+                    )}
+                  </td>
                   <td className="p-4">
                     <div className="flex justify-end gap-2">
                       {tenant.is_active ? (
@@ -286,6 +307,18 @@ const TenantsPage = () => {
                   autoFocus
                 />
               </div>
+              <div className="mb-4">
+                <label className="block text-white/60 text-sm mb-2">Pentest Limit Per Year</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={formData.pentest_limit_per_year}
+                  onChange={(e) => setFormData({ ...formData, pentest_limit_per_year: e.target.value })}
+                  placeholder="Leave blank for unlimited"
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder:text-white/40 focus:border-[#FFA317] focus:outline-none"
+                />
+                <p className="text-white/30 text-xs mt-1">Leave blank for unlimited pentests</p>
+              </div>
               <div className="flex gap-3">
                 <button
                   type="button"
@@ -327,6 +360,18 @@ const TenantsPage = () => {
                   required
                   autoFocus
                 />
+              </div>
+              <div className="mb-4">
+                <label className="block text-white/60 text-sm mb-2">Pentest Limit Per Year</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={formData.pentest_limit_per_year}
+                  onChange={(e) => setFormData({ ...formData, pentest_limit_per_year: e.target.value })}
+                  placeholder="Leave blank for unlimited"
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder:text-white/40 focus:border-[#FFA317] focus:outline-none"
+                />
+                <p className="text-white/30 text-xs mt-1">Leave blank for unlimited pentests</p>
               </div>
               <div className="flex gap-3">
                 <button
