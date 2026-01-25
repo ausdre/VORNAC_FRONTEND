@@ -4,13 +4,32 @@
  */
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import {
+  regenerateTenantAPIKey,
+  suspendTenant,
+  unsuspendTenant,
+  deleteTenant
+} from '../api/tenants';
 
 export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
-  const [activeTab, setActiveTab] = useState('details');
+  const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(false);
   const [ssoConfig, setSsoConfig] = useState(null);
   const [kmsConfig, setKmsConfig] = useState(null);
+  const [tenantUsers, setTenantUsers] = useState([]);
   const [error, setError] = useState('');
+  const [showSuspendForm, setShowSuspendForm] = useState(false);
+  const [suspendReason, setSuspendReason] = useState('');
+  const [showApiKey, setShowApiKey] = useState(false);
+
+  // Close on ESC key
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [onClose]);
 
   // Basic tenant fields
   const [tenantData, setTenantData] = useState({
@@ -84,9 +103,70 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
       if (tenantKms) {
         setKmsConfig(tenantKms);
       }
+
+      // Load tenant users
+      try {
+        const usersRes = await axios.get(`http://localhost:8000/api/v1/admin/users?tenant_id=${tenant.id}`);
+        setTenantUsers(usersRes.data.users || []);
+      } catch (usersErr) {
+        console.error('Failed to load users:', usersErr);
+      }
     } catch (err) {
       console.error('Failed to load configurations:', err);
     }
+  };
+
+  const handleRegenerateAPIKey = async () => {
+    if (!confirm('Regenerate API key? The old key will be immediately invalidated.')) return;
+    try {
+      await regenerateTenantAPIKey(tenant.id);
+      onUpdate();
+      alert('API key regenerated successfully');
+    } catch (err) {
+      alert('Failed to regenerate API key');
+    }
+  };
+
+  const handleSuspend = async () => {
+    if (!suspendReason.trim()) {
+      alert('Please provide a suspension reason');
+      return;
+    }
+    try {
+      await suspendTenant(tenant.id, suspendReason);
+      onUpdate();
+      setShowSuspendForm(false);
+      setSuspendReason('');
+    } catch (err) {
+      alert('Failed to suspend tenant');
+    }
+  };
+
+  const handleUnsuspend = async () => {
+    if (!confirm('Unsuspend this tenant? Users will regain access immediately.')) return;
+    try {
+      await unsuspendTenant(tenant.id);
+      onUpdate();
+    } catch (err) {
+      alert('Failed to unsuspend tenant');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!confirm(`DELETE "${tenant.name}"? This will permanently delete all users and data. This cannot be undone.`)) return;
+    try {
+      await deleteTenant(tenant.id);
+      onUpdate();
+      onClose();
+    } catch (err) {
+      alert('Failed to delete tenant');
+    }
+  };
+
+  const maskAPIKey = (key) => {
+    if (!key) return '';
+    if (showApiKey) return key;
+    return key.slice(0, 8) + '••••••••' + key.slice(-4);
   };
 
   const handleSaveTenant = async () => {
@@ -248,8 +328,14 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-[#0a0b14] border border-white/10 rounded-xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+    <div
+      className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-[#0a0b14] border border-white/10 rounded-xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="p-6 border-b border-white/10">
           <div className="flex items-center justify-between">
@@ -267,7 +353,7 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
 
           {/* Tabs */}
           <div className="flex gap-4 mt-4 border-b border-white/10">
-            {['details', 'authentication', 'encryption'].map((tab) => (
+            {['overview', 'details', 'users', 'authentication', 'encryption'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -277,9 +363,11 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
                     : 'text-white/60 hover:text-white'
                 }`}
               >
-                {tab === 'details' && '📊 Details'}
-                {tab === 'authentication' && '🔐 Authentication'}
-                {tab === 'encryption' && '🔑 Encryption'}
+                {tab === 'overview' && '🏠 Overview'}
+                {tab === 'details' && '📊 Contract'}
+                {tab === 'users' && `👥 Users (${tenantUsers.length})`}
+                {tab === 'authentication' && '🔐 Auth'}
+                {tab === 'encryption' && '🔑 KMS'}
               </button>
             ))}
           </div>
@@ -293,49 +381,292 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
             </div>
           )}
 
-          {/* Details Tab */}
+          {/* Overview Tab */}
+          {activeTab === 'overview' && (
+            <div className="space-y-6">
+              {/* Status Banner */}
+              {!tenant.is_active && (
+                <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-red-400 font-bold">⚠️ SUSPENDED</span>
+                      {tenant.suspension_reason && (
+                        <p className="text-red-400/80 text-sm mt-1">{tenant.suspension_reason}</p>
+                      )}
+                      {tenant.suspended_at && (
+                        <p className="text-red-400/60 text-xs mt-1">
+                          Since: {new Date(tenant.suspended_at).toLocaleDateString()}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={handleUnsuspend}
+                      className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-bold"
+                    >
+                      Unsuspend
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Quick Stats */}
+              <div className="grid grid-cols-4 gap-4">
+                <div className="bg-white/5 rounded-lg p-4">
+                  <div className="text-white/60 text-xs uppercase mb-1">Status</div>
+                  <div className={`text-lg font-bold ${tenant.is_active ? 'text-green-400' : 'text-red-400'}`}>
+                    {tenant.is_active ? 'Active' : 'Suspended'}
+                  </div>
+                </div>
+                <div className="bg-white/5 rounded-lg p-4">
+                  <div className="text-white/60 text-xs uppercase mb-1">Users</div>
+                  <div className="text-lg font-bold text-white">{tenant.user_count || tenantUsers.length}</div>
+                </div>
+                <div className="bg-white/5 rounded-lg p-4">
+                  <div className="text-white/60 text-xs uppercase mb-1">Pentests</div>
+                  <div className="text-lg font-bold text-white">
+                    {tenant.pentest_count || 0}
+                    {tenant.pentest_limit_per_year && (
+                      <span className="text-white/40 text-sm"> / {tenant.pentest_limit_per_year}</span>
+                    )}
+                  </div>
+                </div>
+                <div className="bg-white/5 rounded-lg p-4">
+                  <div className="text-white/60 text-xs uppercase mb-1">Auth Method</div>
+                  <div className="text-lg font-bold text-white">
+                    {ssoConfig ? (
+                      <span className="text-purple-400">SSO</span>
+                    ) : (
+                      <span className="text-blue-400">TOTP</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* API Key Section */}
+              <div className="bg-white/5 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-white font-bold">API Key</div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setShowApiKey(!showApiKey)}
+                      className="px-3 py-1 text-xs text-white/60 hover:text-white border border-white/20 rounded"
+                    >
+                      {showApiKey ? 'Hide' : 'Show'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(tenant.api_key);
+                        alert('API key copied!');
+                      }}
+                      className="px-3 py-1 text-xs text-white/60 hover:text-white border border-white/20 rounded"
+                    >
+                      Copy
+                    </button>
+                    <button
+                      onClick={handleRegenerateAPIKey}
+                      className="px-3 py-1 text-xs text-yellow-400 hover:bg-yellow-400/10 border border-yellow-400/20 rounded"
+                    >
+                      Regenerate
+                    </button>
+                  </div>
+                </div>
+                <code className="text-white/80 font-mono text-sm bg-black/30 px-3 py-2 rounded block">
+                  {maskAPIKey(tenant.api_key)}
+                </code>
+              </div>
+
+              {/* Configuration Status */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-white/5 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-white font-bold">Authentication</span>
+                    {ssoConfig?.enabled ? (
+                      <span className="px-2 py-1 text-xs bg-green-500/10 text-green-400 rounded">Enabled</span>
+                    ) : ssoConfig ? (
+                      <span className="px-2 py-1 text-xs bg-yellow-500/10 text-yellow-400 rounded">Configured</span>
+                    ) : (
+                      <span className="px-2 py-1 text-xs bg-blue-500/10 text-blue-400 rounded">TOTP</span>
+                    )}
+                  </div>
+                  <p className="text-white/60 text-sm">
+                    {ssoConfig ? `${ssoConfig.provider.toUpperCase()} SSO` : 'TOTP Authenticator'}
+                  </p>
+                  <button
+                    onClick={() => setActiveTab('authentication')}
+                    className="text-[#FFA317] text-sm mt-2 hover:underline"
+                  >
+                    Configure →
+                  </button>
+                </div>
+
+                <div className="bg-white/5 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-white font-bold">Encryption (KMS)</span>
+                    {kmsConfig?.enabled ? (
+                      <span className="px-2 py-1 text-xs bg-green-500/10 text-green-400 rounded">Enabled</span>
+                    ) : kmsConfig ? (
+                      <span className="px-2 py-1 text-xs bg-yellow-500/10 text-yellow-400 rounded">Configured</span>
+                    ) : (
+                      <span className="px-2 py-1 text-xs bg-white/10 text-white/40 rounded">Not Set</span>
+                    )}
+                  </div>
+                  <p className="text-white/60 text-sm">
+                    {kmsConfig ? `${kmsConfig.provider.toUpperCase()} KMS` : 'Standard encryption'}
+                  </p>
+                  <button
+                    onClick={() => setActiveTab('encryption')}
+                    className="text-[#FFA317] text-sm mt-2 hover:underline"
+                  >
+                    Configure →
+                  </button>
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              {tenant.is_active && (
+                <div className="border-t border-white/10 pt-4">
+                  <div className="text-white/60 text-sm mb-3">Quick Actions</div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setShowSuspendForm(true)}
+                      className="px-4 py-2 text-orange-400 border border-orange-400/30 rounded hover:bg-orange-400/10"
+                    >
+                      Suspend Tenant
+                    </button>
+                    <button
+                      onClick={handleDelete}
+                      className="px-4 py-2 text-red-400 border border-red-400/30 rounded hover:bg-red-400/10"
+                    >
+                      Delete Tenant
+                    </button>
+                  </div>
+
+                  {showSuspendForm && (
+                    <div className="mt-4 p-4 bg-orange-500/10 border border-orange-500/20 rounded-lg">
+                      <label className="block text-white/60 text-sm mb-2">Suspension Reason</label>
+                      <textarea
+                        value={suspendReason}
+                        onChange={(e) => setSuspendReason(e.target.value)}
+                        placeholder="e.g., Payment overdue, Terms violation..."
+                        className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm"
+                        rows={2}
+                      />
+                      <div className="flex gap-2 mt-2">
+                        <button
+                          onClick={() => {
+                            setShowSuspendForm(false);
+                            setSuspendReason('');
+                          }}
+                          className="px-3 py-1 text-white/60 border border-white/20 rounded text-sm"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleSuspend}
+                          disabled={!suspendReason.trim()}
+                          className="px-3 py-1 bg-orange-500 text-white rounded text-sm font-bold disabled:opacity-50"
+                        >
+                          Confirm Suspend
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Contract/Details Tab */}
           {activeTab === 'details' && (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-white/60 text-sm mb-2">Tenant Name</label>
-                <input
-                  type="text"
-                  value={tenantData.name}
-                  onChange={(e) => setTenantData({ ...tenantData, name: e.target.value })}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white"
-                />
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-white/60 text-sm mb-2">Tenant Name</label>
+                  <input
+                    type="text"
+                    value={tenantData.name}
+                    onChange={(e) => setTenantData({ ...tenantData, name: e.target.value })}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-white/60 text-sm mb-2">Tenant ID</label>
+                  <input
+                    type="text"
+                    value={tenant.id}
+                    disabled
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white/40"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-white/60 text-sm mb-2">Pentest Limit (per year)</label>
-                <input
-                  type="number"
-                  value={tenantData.pentest_limit_per_year}
-                  onChange={(e) => setTenantData({ ...tenantData, pentest_limit_per_year: e.target.value })}
-                  placeholder="Unlimited"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white"
-                />
+              <div className="border-t border-white/10 pt-4">
+                <h4 className="text-white font-bold mb-4">Contract Details</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-white/60 text-sm mb-2">Pentest Limit (per year)</label>
+                    <input
+                      type="number"
+                      value={tenantData.pentest_limit_per_year}
+                      onChange={(e) => setTenantData({ ...tenantData, pentest_limit_per_year: e.target.value })}
+                      placeholder="Unlimited"
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white"
+                    />
+                    <p className="text-white/40 text-xs mt-1">Leave blank for unlimited</p>
+                  </div>
+                  <div>
+                    <label className="block text-white/60 text-sm mb-2">Contract End Date</label>
+                    <input
+                      type="date"
+                      value={tenantData.contract_end_date}
+                      onChange={(e) => setTenantData({ ...tenantData, contract_end_date: e.target.value })}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white"
+                    />
+                    <p className="text-white/40 text-xs mt-1">Leave blank for unlimited</p>
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-white/60 text-sm mb-2">Contract End Date</label>
-                <input
-                  type="date"
-                  value={tenantData.contract_end_date}
-                  onChange={(e) => setTenantData({ ...tenantData, contract_end_date: e.target.value })}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white"
-                />
+              <div className="border-t border-white/10 pt-4">
+                <h4 className="text-white font-bold mb-4">Revenue & Analytics</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-white/60 text-sm mb-2">Annual ARR (€)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={tenantData.annual_arr}
+                      onChange={(e) => setTenantData({ ...tenantData, annual_arr: e.target.value })}
+                      placeholder="0.00"
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-white/60 text-sm mb-2">Cost per Pentest</label>
+                    <div className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white/60">
+                      {tenant.cost_per_pentest
+                        ? `€${parseFloat(tenant.cost_per_pentest).toFixed(2)}`
+                        : 'N/A'}
+                    </div>
+                    <p className="text-white/40 text-xs mt-1">Calculated from ARR / pentests</p>
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-white/60 text-sm mb-2">Annual ARR (€)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={tenantData.annual_arr}
-                  onChange={(e) => setTenantData({ ...tenantData, annual_arr: e.target.value })}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white"
-                />
+              <div className="border-t border-white/10 pt-4">
+                <h4 className="text-white font-bold mb-4">Metadata</h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-white/60">Created:</span>
+                    <span className="text-white ml-2">
+                      {tenant.created_at ? new Date(tenant.created_at).toLocaleDateString() : 'N/A'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-white/60">Total Pentests:</span>
+                    <span className="text-white ml-2">{tenant.pentest_count || 0}</span>
+                  </div>
+                </div>
               </div>
 
               <div className="pt-4">
@@ -347,6 +678,72 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
                   {loading ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* Users Tab */}
+          {activeTab === 'users' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-white font-bold">Tenant Users ({tenantUsers.length})</h3>
+              </div>
+
+              {tenantUsers.length === 0 ? (
+                <div className="text-center py-8 text-white/40">
+                  No users found for this tenant
+                </div>
+              ) : (
+                <div className="bg-white/5 rounded-lg overflow-hidden">
+                  <table className="w-full">
+                    <thead className="bg-white/5">
+                      <tr>
+                        <th className="text-left p-3 text-white/60 text-sm">Email</th>
+                        <th className="text-left p-3 text-white/60 text-sm">Name</th>
+                        <th className="text-left p-3 text-white/60 text-sm">Role</th>
+                        <th className="text-left p-3 text-white/60 text-sm">MFA</th>
+                        <th className="text-left p-3 text-white/60 text-sm">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {tenantUsers.map((user) => (
+                        <tr key={user.id} className="hover:bg-white/5">
+                          <td className="p-3 text-white">{user.email}</td>
+                          <td className="p-3 text-white/80">
+                            {user.first_name} {user.last_name}
+                          </td>
+                          <td className="p-3">
+                            <span className={`px-2 py-1 text-xs rounded ${
+                              user.role === 'admin'
+                                ? 'bg-purple-500/10 text-purple-400'
+                                : 'bg-blue-500/10 text-blue-400'
+                            }`}>
+                              {user.role}
+                            </span>
+                          </td>
+                          <td className="p-3">
+                            {user.mfa_enabled ? (
+                              <span className="text-green-400 text-sm">✓ Enabled</span>
+                            ) : (
+                              <span className="text-white/40 text-sm">Not set</span>
+                            )}
+                          </td>
+                          <td className="p-3">
+                            {user.is_active ? (
+                              <span className="text-green-400 text-sm">Active</span>
+                            ) : (
+                              <span className="text-red-400 text-sm">Inactive</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <p className="text-white/40 text-xs">
+                Manage users from the Users page in the admin panel.
+              </p>
             </div>
           )}
 

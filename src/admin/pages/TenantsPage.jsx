@@ -32,8 +32,23 @@ const TenantsPage = () => {
     name: '',
     pentest_limit_per_year: '',
     contract_end_date: '',
-    annual_arr: ''
+    annual_arr: '',
+    // Auth configuration
+    auth_type: 'totp', // 'totp' or 'sso'
+    sso_provider: 'okta',
+    sso_idp_entity_id: '',
+    sso_idp_sso_url: '',
+    sso_idp_certificate: '',
+    sso_jit_provisioning: true,
+    // KMS configuration
+    kms_enabled: false,
+    kms_provider: 'aws',
+    kms_kek_id: '',
+    kms_aws_region: 'us-east-1',
+    kms_aws_access_key: '',
+    kms_aws_secret_key: ''
   });
+  const [createStep, setCreateStep] = useState(1); // 1: Basic, 2: Auth, 3: KMS
   const [error, setError] = useState('');
   const [showSuspendModal, setShowSuspendModal] = useState(false);
   const [selectedTenantForSuspend, setSelectedTenantForSuspend] = useState(null);
@@ -43,6 +58,23 @@ const TenantsPage = () => {
   const [sortColumn, setSortColumn] = useState('name');
   const [sortDirection, setSortDirection] = useState('asc');
   const [statusFilter, setStatusFilter] = useState('all');
+
+  // Close modals on ESC key
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') {
+        if (showCreateModal) setShowCreateModal(false);
+        if (showEditModal) setShowEditModal(false);
+        if (showSuspendModal) {
+          setShowSuspendModal(false);
+          setSuspendReason('');
+          setSelectedTenantForSuspend(null);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [showCreateModal, showEditModal, showSuspendModal]);
   const [contractFilter, setContractFilter] = useState('all');
 
   const fetchTenants = async () => {
@@ -101,7 +133,7 @@ const TenantsPage = () => {
   };
 
   const handleCreate = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     setError('');
     try {
       // Format the payload - convert empty strings to null for optional fields
@@ -111,13 +143,75 @@ const TenantsPage = () => {
         contract_end_date: formData.contract_end_date === '' ? null : formData.contract_end_date,
         annual_arr: formData.annual_arr === '' ? null : parseFloat(formData.annual_arr)
       };
-      await createTenant(payload);
+      const newTenant = await createTenant(payload);
+
+      // Create SSO configuration if SSO auth type selected
+      if (formData.auth_type === 'sso' && formData.sso_idp_entity_id) {
+        try {
+          await axios.post('http://localhost:8000/api/v1/admin/sso/configurations', {
+            tenant_id: newTenant.id,
+            provider: formData.sso_provider,
+            idp_entity_id: formData.sso_idp_entity_id,
+            idp_sso_url: formData.sso_idp_sso_url,
+            idp_certificate: formData.sso_idp_certificate,
+            jit_provisioning: formData.sso_jit_provisioning
+          });
+        } catch (ssoErr) {
+          console.error('Failed to create SSO config:', ssoErr);
+        }
+      }
+
+      // Create KMS configuration if enabled
+      if (formData.kms_enabled && formData.kms_kek_id) {
+        try {
+          const kmsProviderConfig = formData.kms_provider === 'aws' ? {
+            region: formData.kms_aws_region,
+            access_key_id: formData.kms_aws_access_key,
+            secret_access_key: formData.kms_aws_secret_key
+          } : {};
+
+          await axios.post('http://localhost:8000/api/v1/admin/kms/configurations', {
+            tenant_id: newTenant.id,
+            provider: formData.kms_provider,
+            kek_id: formData.kms_kek_id,
+            provider_config: kmsProviderConfig,
+            use_cases: ['pentest_results'],
+            byok_enabled: false
+          });
+        } catch (kmsErr) {
+          console.error('Failed to create KMS config:', kmsErr);
+        }
+      }
+
       setShowCreateModal(false);
-      setFormData({ name: '', pentest_limit_per_year: '', contract_end_date: '', annual_arr: '' });
+      resetFormData();
       fetchTenants();
+      fetchConfigurations();
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to create tenant');
     }
+  };
+
+  const resetFormData = () => {
+    setFormData({
+      name: '',
+      pentest_limit_per_year: '',
+      contract_end_date: '',
+      annual_arr: '',
+      auth_type: 'totp',
+      sso_provider: 'okta',
+      sso_idp_entity_id: '',
+      sso_idp_sso_url: '',
+      sso_idp_certificate: '',
+      sso_jit_provisioning: true,
+      kms_enabled: false,
+      kms_provider: 'aws',
+      kms_kek_id: '',
+      kms_aws_region: 'us-east-1',
+      kms_aws_access_key: '',
+      kms_aws_secret_key: ''
+    });
+    setCreateStep(1);
   };
 
   const handleUpdate = async (e) => {
@@ -313,7 +407,7 @@ const TenantsPage = () => {
         </h1>
         <button
           onClick={() => {
-            setFormData({ name: '', pentest_limit_per_year: '', contract_end_date: '', annual_arr: '' });
+            resetFormData();
             setError('');
             setShowCreateModal(true);
           }}
@@ -428,7 +522,11 @@ const TenantsPage = () => {
             </thead>
             <tbody className="divide-y divide-white/5">
               {getFilteredAndSortedTenants().map((tenant) => (
-                <tr key={tenant.id} className={`hover:bg-white/5 ${!tenant.is_active ? 'opacity-60' : ''}`}>
+                <tr
+                  key={tenant.id}
+                  onClick={() => openDetailModal(tenant)}
+                  className={`hover:bg-white/5 cursor-pointer transition-colors ${!tenant.is_active ? 'opacity-60' : ''}`}
+                >
                   <td className="p-4 font-medium text-white">{tenant.name}</td>
                   <td className="p-4">
                     {tenant.is_active ? (
@@ -502,14 +600,8 @@ const TenantsPage = () => {
                       <span className="text-white/40 italic">Unlimited</span>
                     )}
                   </td>
-                  <td className="p-4">
+                  <td className="p-4" onClick={(e) => e.stopPropagation()}>
                     <div className="flex justify-end gap-2">
-                      <button
-                        onClick={() => openDetailModal(tenant)}
-                        className="px-3 py-1 text-sm text-[#FFA317] hover:bg-[#FFA317]/10 rounded font-bold"
-                      >
-                        View
-                      </button>
                       {tenant.is_active ? (
                         <>
                           <button
@@ -562,87 +654,341 @@ const TenantsPage = () => {
         )}
       </div>
 
-      {/* Create Modal */}
+      {/* Create Modal - Multi-step wizard */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-[#0a0b14] border border-white/10 rounded-xl p-8 w-full max-w-md">
-            <h2 className="text-xl font-bold text-white mb-4">Create Tenant</h2>
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          onClick={() => setShowCreateModal(false)}
+        >
+          <div
+            className="bg-[#0a0b14] border border-white/10 rounded-xl p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-white">Create Tenant</h2>
+              <div className="flex gap-2">
+                {[1, 2, 3].map((step) => (
+                  <div
+                    key={step}
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                      createStep === step
+                        ? 'bg-[#FFA317] text-black'
+                        : createStep > step
+                        ? 'bg-green-500 text-white'
+                        : 'bg-white/10 text-white/40'
+                    }`}
+                  >
+                    {createStep > step ? '✓' : step}
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {error && (
               <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded text-red-500 text-sm">
                 {error}
               </div>
             )}
-            <form onSubmit={handleCreate}>
-              <div className="mb-4">
-                <label className="block text-white/60 text-sm mb-2">Tenant Name</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder:text-white/40 focus:border-[#FFA317] focus:outline-none"
-                  required
-                  autoFocus
-                />
+
+            {/* Step 1: Basic Info */}
+            {createStep === 1 && (
+              <div className="space-y-4">
+                <p className="text-white/60 text-sm mb-4">Step 1: Basic tenant information</p>
+                <div>
+                  <label className="block text-white/60 text-sm mb-2">Tenant Name *</label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder:text-white/40 focus:border-[#FFA317] focus:outline-none"
+                    placeholder="Company Name"
+                    required
+                    autoFocus
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-white/60 text-sm mb-2">Pentest Limit / Year</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={formData.pentest_limit_per_year}
+                      onChange={(e) => setFormData({ ...formData, pentest_limit_per_year: e.target.value })}
+                      placeholder="Unlimited"
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder:text-white/40 focus:border-[#FFA317] focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-white/60 text-sm mb-2">Annual ARR (€)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={formData.annual_arr}
+                      onChange={(e) => setFormData({ ...formData, annual_arr: e.target.value })}
+                      placeholder="Revenue"
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder:text-white/40 focus:border-[#FFA317] focus:outline-none"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-white/60 text-sm mb-2">Contract End Date</label>
+                  <input
+                    type="date"
+                    value={formData.contract_end_date}
+                    onChange={(e) => setFormData({ ...formData, contract_end_date: e.target.value })}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-[#FFA317] focus:outline-none"
+                  />
+                  <p className="text-white/30 text-xs mt-1">Leave blank for unlimited contract</p>
+                </div>
               </div>
-              <div className="mb-4">
-                <label className="block text-white/60 text-sm mb-2">Pentest Limit Per Year</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={formData.pentest_limit_per_year}
-                  onChange={(e) => setFormData({ ...formData, pentest_limit_per_year: e.target.value })}
-                  placeholder="Leave blank for unlimited"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder:text-white/40 focus:border-[#FFA317] focus:outline-none"
-                />
-                <p className="text-white/30 text-xs mt-1">Leave blank for unlimited pentests</p>
+            )}
+
+            {/* Step 2: Authentication */}
+            {createStep === 2 && (
+              <div className="space-y-4">
+                <p className="text-white/60 text-sm mb-4">Step 2: Choose authentication method</p>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, auth_type: 'totp' })}
+                    className={`p-4 rounded-lg border-2 transition-all text-left ${
+                      formData.auth_type === 'totp'
+                        ? 'border-[#FFA317] bg-[#FFA317]/10'
+                        : 'border-white/10 hover:border-white/30'
+                    }`}
+                  >
+                    <div className="text-2xl mb-2">📱</div>
+                    <div className="text-white font-bold">TOTP Authenticator</div>
+                    <div className="text-white/60 text-xs mt-1">Google Authenticator, Authy, etc.</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, auth_type: 'sso' })}
+                    className={`p-4 rounded-lg border-2 transition-all text-left ${
+                      formData.auth_type === 'sso'
+                        ? 'border-[#FFA317] bg-[#FFA317]/10'
+                        : 'border-white/10 hover:border-white/30'
+                    }`}
+                  >
+                    <div className="text-2xl mb-2">🔐</div>
+                    <div className="text-white font-bold">SSO / SAML</div>
+                    <div className="text-white/60 text-xs mt-1">Okta, Azure AD, Google, etc.</div>
+                  </button>
+                </div>
+
+                {formData.auth_type === 'sso' && (
+                  <div className="space-y-3 p-4 bg-white/5 rounded-lg mt-4">
+                    <div>
+                      <label className="block text-white/60 text-sm mb-2">SSO Provider</label>
+                      <select
+                        value={formData.sso_provider}
+                        onChange={(e) => setFormData({ ...formData, sso_provider: e.target.value })}
+                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white"
+                      >
+                        <option value="okta">Okta</option>
+                        <option value="azure_ad">Azure AD</option>
+                        <option value="google">Google Workspace</option>
+                        <option value="onelogin">OneLogin</option>
+                        <option value="generic">Generic SAML 2.0</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-white/60 text-sm mb-2">IdP Entity ID</label>
+                      <input
+                        type="text"
+                        value={formData.sso_idp_entity_id}
+                        onChange={(e) => setFormData({ ...formData, sso_idp_entity_id: e.target.value })}
+                        placeholder="http://www.okta.com/exk..."
+                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white font-mono text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-white/60 text-sm mb-2">IdP SSO URL</label>
+                      <input
+                        type="url"
+                        value={formData.sso_idp_sso_url}
+                        onChange={(e) => setFormData({ ...formData, sso_idp_sso_url: e.target.value })}
+                        placeholder="https://your-org.okta.com/..."
+                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white font-mono text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-white/60 text-sm mb-2">IdP Certificate (X.509)</label>
+                      <textarea
+                        value={formData.sso_idp_certificate}
+                        onChange={(e) => setFormData({ ...formData, sso_idp_certificate: e.target.value })}
+                        placeholder="MIICmTCCAYGgAwIBAgIGAY..."
+                        rows={3}
+                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white font-mono text-sm"
+                      />
+                    </div>
+                    <label className="flex items-center text-white cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.sso_jit_provisioning}
+                        onChange={(e) => setFormData({ ...formData, sso_jit_provisioning: e.target.checked })}
+                        className="mr-2"
+                      />
+                      <span className="text-sm">Enable JIT Provisioning (auto-create users)</span>
+                    </label>
+                  </div>
+                )}
+
+                {formData.auth_type === 'totp' && (
+                  <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                    <p className="text-blue-400 text-sm">
+                      Users will set up Google Authenticator or similar apps. They'll scan a QR code and enter 6-digit codes to authenticate.
+                    </p>
+                  </div>
+                )}
               </div>
-              <div className="mb-4">
-                <label className="block text-white/60 text-sm mb-2">Contract End Date</label>
-                <input
-                  type="date"
-                  value={formData.contract_end_date}
-                  onChange={(e) => setFormData({ ...formData, contract_end_date: e.target.value })}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-[#FFA317] focus:outline-none"
-                />
-                <p className="text-white/30 text-xs mt-1">Leave blank for unlimited contract</p>
+            )}
+
+            {/* Step 3: Encryption (KMS) */}
+            {createStep === 3 && (
+              <div className="space-y-4">
+                <p className="text-white/60 text-sm mb-4">Step 3: Encryption settings (optional)</p>
+
+                <label className="flex items-center p-4 bg-white/5 rounded-lg cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.kms_enabled}
+                    onChange={(e) => setFormData({ ...formData, kms_enabled: e.target.checked })}
+                    className="mr-3 w-5 h-5"
+                  />
+                  <div>
+                    <div className="text-white font-bold">Enable KMS Encryption</div>
+                    <div className="text-white/60 text-xs">Encrypt sensitive data with external key management</div>
+                  </div>
+                </label>
+
+                {formData.kms_enabled && (
+                  <div className="space-y-3 p-4 bg-white/5 rounded-lg">
+                    <div>
+                      <label className="block text-white/60 text-sm mb-2">KMS Provider</label>
+                      <select
+                        value={formData.kms_provider}
+                        onChange={(e) => setFormData({ ...formData, kms_provider: e.target.value })}
+                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white"
+                      >
+                        <option value="aws">AWS KMS</option>
+                        <option value="azure">Azure Key Vault</option>
+                        <option value="gcp">Google Cloud KMS</option>
+                        <option value="vault">HashiCorp Vault</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-white/60 text-sm mb-2">Key ID / ARN</label>
+                      <input
+                        type="text"
+                        value={formData.kms_kek_id}
+                        onChange={(e) => setFormData({ ...formData, kms_kek_id: e.target.value })}
+                        placeholder="arn:aws:kms:us-east-1:..."
+                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white font-mono text-sm"
+                      />
+                    </div>
+                    {formData.kms_provider === 'aws' && (
+                      <>
+                        <div>
+                          <label className="block text-white/60 text-sm mb-2">AWS Region</label>
+                          <input
+                            type="text"
+                            value={formData.kms_aws_region}
+                            onChange={(e) => setFormData({ ...formData, kms_aws_region: e.target.value })}
+                            placeholder="us-east-1"
+                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-white/60 text-sm mb-2">Access Key ID</label>
+                          <input
+                            type="text"
+                            value={formData.kms_aws_access_key}
+                            onChange={(e) => setFormData({ ...formData, kms_aws_access_key: e.target.value })}
+                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white font-mono text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-white/60 text-sm mb-2">Secret Access Key</label>
+                          <input
+                            type="password"
+                            value={formData.kms_aws_secret_key}
+                            onChange={(e) => setFormData({ ...formData, kms_aws_secret_key: e.target.value })}
+                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white font-mono text-sm"
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {!formData.kms_enabled && (
+                  <div className="p-4 bg-white/5 border border-white/10 rounded-lg">
+                    <p className="text-white/60 text-sm">
+                      Standard encryption will be used. You can enable KMS later from the tenant details.
+                    </p>
+                  </div>
+                )}
               </div>
-              <div className="mb-4">
-                <label className="block text-white/60 text-sm mb-2">Annual ARR (€)</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.annual_arr}
-                  onChange={(e) => setFormData({ ...formData, annual_arr: e.target.value })}
-                  placeholder="Annual recurring revenue"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder:text-white/40 focus:border-[#FFA317] focus:outline-none"
-                />
-                <p className="text-white/30 text-xs mt-1">Used for cost-per-pentest analytics</p>
-              </div>
-              <div className="flex gap-3">
+            )}
+
+            {/* Navigation buttons */}
+            <div className="flex gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => {
+                  if (createStep === 1) {
+                    setShowCreateModal(false);
+                  } else {
+                    setCreateStep(createStep - 1);
+                  }
+                }}
+                className="flex-1 px-4 py-2 border border-white/20 text-white rounded hover:bg-white/5"
+              >
+                {createStep === 1 ? 'Cancel' : 'Back'}
+              </button>
+              {createStep < 3 ? (
                 <button
                   type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="flex-1 px-4 py-2 border border-white/20 text-white rounded hover:bg-white/5"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
+                  onClick={() => {
+                    if (createStep === 1 && !formData.name.trim()) {
+                      setError('Tenant name is required');
+                      return;
+                    }
+                    setError('');
+                    setCreateStep(createStep + 1);
+                  }}
                   className="flex-1 px-4 py-2 bg-[#FFA317] text-black font-bold rounded hover:bg-white"
                 >
-                  Create
+                  Next
                 </button>
-              </div>
-            </form>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleCreate}
+                  className="flex-1 px-4 py-2 bg-[#FFA317] text-black font-bold rounded hover:bg-white"
+                >
+                  Create Tenant
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
 
       {/* Edit Modal */}
       {showEditModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-[#0a0b14] border border-white/10 rounded-xl p-8 w-full max-w-md">
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          onClick={() => setShowEditModal(false)}
+        >
+          <div
+            className="bg-[#0a0b14] border border-white/10 rounded-xl p-8 w-full max-w-md"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h2 className="text-xl font-bold text-white mb-4">Edit Tenant</h2>
             {error && (
               <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded text-red-500 text-sm">
@@ -718,8 +1064,18 @@ const TenantsPage = () => {
 
       {/* Suspend Modal */}
       {showSuspendModal && selectedTenantForSuspend && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-[#0a0b14] border border-white/10 rounded-xl p-8 w-full max-w-md">
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          onClick={() => {
+            setShowSuspendModal(false);
+            setSuspendReason('');
+            setSelectedTenantForSuspend(null);
+          }}
+        >
+          <div
+            className="bg-[#0a0b14] border border-white/10 rounded-xl p-8 w-full max-w-md"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h2 className="text-xl font-bold text-white mb-4">Suspend Tenant</h2>
             <div className="mb-4 p-3 bg-orange-500/10 border border-orange-500/20 rounded">
               <p className="text-orange-400 text-sm font-bold">Warning: This will immediately block all users from "{selectedTenantForSuspend.name}"</p>

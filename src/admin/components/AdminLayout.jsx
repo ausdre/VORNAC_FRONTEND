@@ -29,9 +29,11 @@ const AdminLayout = ({ children }) => {
             {/* Logo */}
             <div className="flex items-center gap-3">
               <Link to="/admin/dashboard" className="flex items-center">
-                <h1 className="text-xl font-bold" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-                  VORNAC
-                </h1>
+                <img
+                  src="/vornac_static.svg"
+                  alt="VORNAC"
+                  className="h-7 w-auto drop-shadow-[0_0_10px_rgba(255,163,23,0.5)]"
+                />
               </Link>
               <span className="px-2 py-0.5 bg-orange-500 text-black text-xs font-bold rounded">
                 ADMIN
