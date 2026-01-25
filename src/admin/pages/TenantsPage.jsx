@@ -22,7 +22,12 @@ const TenantsPage = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState(null);
-  const [formData, setFormData] = useState({ name: '', pentest_limit_per_year: '' });
+  const [formData, setFormData] = useState({
+    name: '',
+    pentest_limit_per_year: '',
+    contract_end_date: '',
+    annual_arr: ''
+  });
   const [error, setError] = useState('');
   const [showSuspendModal, setShowSuspendModal] = useState(false);
   const [selectedTenantForSuspend, setSelectedTenantForSuspend] = useState(null);
@@ -49,14 +54,16 @@ const TenantsPage = () => {
     e.preventDefault();
     setError('');
     try {
-      // Format the payload - convert empty string to null for optional integer field
+      // Format the payload - convert empty strings to null for optional fields
       const payload = {
         name: formData.name,
-        pentest_limit_per_year: formData.pentest_limit_per_year === '' ? null : parseInt(formData.pentest_limit_per_year)
+        pentest_limit_per_year: formData.pentest_limit_per_year === '' ? null : parseInt(formData.pentest_limit_per_year),
+        contract_end_date: formData.contract_end_date === '' ? null : formData.contract_end_date,
+        annual_arr: formData.annual_arr === '' ? null : parseFloat(formData.annual_arr)
       };
       await createTenant(payload);
       setShowCreateModal(false);
-      setFormData({ name: '', pentest_limit_per_year: '' });
+      setFormData({ name: '', pentest_limit_per_year: '', contract_end_date: '', annual_arr: '' });
       fetchTenants();
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to create tenant');
@@ -67,15 +74,17 @@ const TenantsPage = () => {
     e.preventDefault();
     setError('');
     try {
-      // Format the payload - convert empty string to null for optional integer field
+      // Format the payload - convert empty strings to null for optional fields
       const payload = {
         name: formData.name,
-        pentest_limit_per_year: formData.pentest_limit_per_year === '' ? null : parseInt(formData.pentest_limit_per_year)
+        pentest_limit_per_year: formData.pentest_limit_per_year === '' ? null : parseInt(formData.pentest_limit_per_year),
+        contract_end_date: formData.contract_end_date === '' ? null : formData.contract_end_date,
+        annual_arr: formData.annual_arr === '' ? null : parseFloat(formData.annual_arr)
       };
       await updateTenant(selectedTenant.id, payload);
       setShowEditModal(false);
       setSelectedTenant(null);
-      setFormData({ name: '', pentest_limit_per_year: '' });
+      setFormData({ name: '', pentest_limit_per_year: '', contract_end_date: '', annual_arr: '' });
       fetchTenants();
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to update tenant');
@@ -147,7 +156,9 @@ const TenantsPage = () => {
     setSelectedTenant(tenant);
     setFormData({
       name: tenant.name,
-      pentest_limit_per_year: tenant.pentest_limit_per_year || ''
+      pentest_limit_per_year: tenant.pentest_limit_per_year || '',
+      contract_end_date: tenant.contract_end_date ? tenant.contract_end_date.split('T')[0] : '',
+      annual_arr: tenant.annual_arr || ''
     });
     setShowEditModal(true);
   };
@@ -165,7 +176,7 @@ const TenantsPage = () => {
         </h1>
         <button
           onClick={() => {
-            setFormData({ name: '', pentest_limit_per_year: '' });
+            setFormData({ name: '', pentest_limit_per_year: '', contract_end_date: '', annual_arr: '' });
             setError('');
             setShowCreateModal(true);
           }}
@@ -200,7 +211,9 @@ const TenantsPage = () => {
                 <th className="text-left p-4 text-white/60 text-sm font-bold">Status</th>
                 <th className="text-left p-4 text-white/60 text-sm font-bold">API Key</th>
                 <th className="text-left p-4 text-white/60 text-sm font-bold">Users</th>
-                <th className="text-left p-4 text-white/60 text-sm font-bold">Pentest Limit</th>
+                <th className="text-left p-4 text-white/60 text-sm font-bold">Pentests</th>
+                <th className="text-left p-4 text-white/60 text-sm font-bold">Cost/Pentest</th>
+                <th className="text-left p-4 text-white/60 text-sm font-bold">Contract End</th>
                 <th className="text-right p-4 text-white/60 text-sm font-bold">Actions</th>
               </tr>
             </thead>
@@ -225,8 +238,23 @@ const TenantsPage = () => {
                   </td>
                   <td className="p-4 text-white/60">{tenant.user_count}</td>
                   <td className="p-4 text-white/60">
-                    {tenant.pentest_limit_per_year ? (
-                      <span>{tenant.pentest_limit_per_year}/year</span>
+                    {tenant.pentest_count || 0}
+                    {tenant.pentest_limit_per_year && (
+                      <span className="text-white/40 text-xs ml-1">
+                        / {tenant.pentest_limit_per_year}
+                      </span>
+                    )}
+                  </td>
+                  <td className="p-4 text-white/60">
+                    {tenant.cost_per_pentest ? (
+                      <span>€{parseFloat(tenant.cost_per_pentest).toFixed(2)}</span>
+                    ) : (
+                      <span className="text-white/40 italic">-</span>
+                    )}
+                  </td>
+                  <td className="p-4 text-white/60">
+                    {tenant.contract_end_date ? (
+                      <span>{new Date(tenant.contract_end_date).toLocaleDateString('de-DE')}</span>
                     ) : (
                       <span className="text-white/40 italic">Unlimited</span>
                     )}
@@ -319,6 +347,29 @@ const TenantsPage = () => {
                 />
                 <p className="text-white/30 text-xs mt-1">Leave blank for unlimited pentests</p>
               </div>
+              <div className="mb-4">
+                <label className="block text-white/60 text-sm mb-2">Contract End Date</label>
+                <input
+                  type="date"
+                  value={formData.contract_end_date}
+                  onChange={(e) => setFormData({ ...formData, contract_end_date: e.target.value })}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-[#FFA317] focus:outline-none"
+                />
+                <p className="text-white/30 text-xs mt-1">Leave blank for unlimited contract</p>
+              </div>
+              <div className="mb-4">
+                <label className="block text-white/60 text-sm mb-2">Annual ARR (€)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.annual_arr}
+                  onChange={(e) => setFormData({ ...formData, annual_arr: e.target.value })}
+                  placeholder="Annual recurring revenue"
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder:text-white/40 focus:border-[#FFA317] focus:outline-none"
+                />
+                <p className="text-white/30 text-xs mt-1">Used for cost-per-pentest analytics</p>
+              </div>
               <div className="flex gap-3">
                 <button
                   type="button"
@@ -372,6 +423,29 @@ const TenantsPage = () => {
                   className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder:text-white/40 focus:border-[#FFA317] focus:outline-none"
                 />
                 <p className="text-white/30 text-xs mt-1">Leave blank for unlimited pentests</p>
+              </div>
+              <div className="mb-4">
+                <label className="block text-white/60 text-sm mb-2">Contract End Date</label>
+                <input
+                  type="date"
+                  value={formData.contract_end_date}
+                  onChange={(e) => setFormData({ ...formData, contract_end_date: e.target.value })}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-[#FFA317] focus:outline-none"
+                />
+                <p className="text-white/30 text-xs mt-1">Leave blank for unlimited contract</p>
+              </div>
+              <div className="mb-4">
+                <label className="block text-white/60 text-sm mb-2">Annual ARR (€)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.annual_arr}
+                  onChange={(e) => setFormData({ ...formData, annual_arr: e.target.value })}
+                  placeholder="Annual recurring revenue"
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder:text-white/40 focus:border-[#FFA317] focus:outline-none"
+                />
+                <p className="text-white/30 text-xs mt-1">Used for cost-per-pentest analytics</p>
               </div>
               <div className="flex gap-3">
                 <button
