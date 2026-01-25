@@ -1,8 +1,9 @@
 /**
  * Tenants Management Page
- * CRUD operations for tenants
+ * CRUD operations for tenants with SSO/KMS integration
  */
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import {
   listTenants,
   createTenant,
@@ -12,6 +13,7 @@ import {
   suspendTenant,
   unsuspendTenant
 } from '../api/tenants';
+import TenantDetailModal from '../components/TenantDetailModal';
 
 const TenantsPage = () => {
   const [tenants, setTenants] = useState([]);
@@ -22,6 +24,10 @@ const TenantsPage = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedTenantForDetail, setSelectedTenantForDetail] = useState(null);
+  const [ssoConfigs, setSsoConfigs] = useState({});
+  const [kmsConfigs, setKmsConfigs] = useState({});
   const [formData, setFormData] = useState({
     name: '',
     pentest_limit_per_year: '',
@@ -52,9 +58,47 @@ const TenantsPage = () => {
     }
   };
 
+  const fetchConfigurations = async () => {
+    try {
+      // Fetch SSO configs
+      const ssoRes = await axios.get('http://localhost:8000/api/v1/admin/sso/configurations');
+      const ssoMap = {};
+      ssoRes.data.forEach(config => {
+        ssoMap[config.tenant_id] = config;
+      });
+      setSsoConfigs(ssoMap);
+
+      // Fetch KMS configs
+      const kmsRes = await axios.get('http://localhost:8000/api/v1/admin/kms/configurations');
+      const kmsMap = {};
+      kmsRes.data.forEach(config => {
+        kmsMap[config.tenant_id] = config;
+      });
+      setKmsConfigs(kmsMap);
+    } catch (err) {
+      console.error('Failed to fetch configurations:', err);
+    }
+  };
+
   useEffect(() => {
     fetchTenants();
+    fetchConfigurations();
   }, [page, search]);
+
+  const openDetailModal = (tenant) => {
+    setSelectedTenantForDetail(tenant);
+    setShowDetailModal(true);
+  };
+
+  const handleDetailModalClose = () => {
+    setShowDetailModal(false);
+    setSelectedTenantForDetail(null);
+  };
+
+  const handleDetailModalUpdate = () => {
+    fetchTenants();
+    fetchConfigurations();
+  };
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -354,6 +398,7 @@ const TenantsPage = () => {
                   Status <SortIcon column="status" />
                 </th>
                 <th className="text-left p-4 text-white/60 text-sm font-bold">API Key</th>
+                <th className="text-left p-4 text-white/60 text-sm font-bold">Auth / KMS</th>
                 <th
                   onClick={() => handleSort('users')}
                   className="text-left p-4 text-white/60 text-sm font-bold cursor-pointer hover:text-white transition-colors"
@@ -400,6 +445,40 @@ const TenantsPage = () => {
                   <td className="p-4 font-mono text-sm text-white/60">
                     {maskAPIKey(tenant.api_key)}
                   </td>
+                  <td className="p-4">
+                    <div className="flex gap-2">
+                      {/* SSO Status */}
+                      {ssoConfigs[tenant.id] ? (
+                        <span
+                          className={`px-2 py-1 text-xs font-bold rounded ${
+                            ssoConfigs[tenant.id].enabled
+                              ? 'bg-purple-500/10 text-purple-400'
+                              : 'bg-yellow-500/10 text-yellow-400'
+                          }`}
+                          title={`SSO: ${ssoConfigs[tenant.id].provider} (${ssoConfigs[tenant.id].enabled ? 'Enabled' : 'Configured'})`}
+                        >
+                          SSO
+                        </span>
+                      ) : (
+                        <span className="px-2 py-1 text-xs font-bold rounded bg-blue-500/10 text-blue-400" title="Using TOTP Authenticator">
+                          TOTP
+                        </span>
+                      )}
+                      {/* KMS Status */}
+                      {kmsConfigs[tenant.id] && (
+                        <span
+                          className={`px-2 py-1 text-xs font-bold rounded ${
+                            kmsConfigs[tenant.id].enabled
+                              ? 'bg-green-500/10 text-green-400'
+                              : 'bg-yellow-500/10 text-yellow-400'
+                          }`}
+                          title={`KMS: ${kmsConfigs[tenant.id].provider} (${kmsConfigs[tenant.id].enabled ? 'Enabled' : 'Configured'})`}
+                        >
+                          KMS
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td className="p-4 text-white/60">{tenant.user_count}</td>
                   <td className="p-4 text-white/60">
                     {tenant.pentest_count || 0}
@@ -425,6 +504,12 @@ const TenantsPage = () => {
                   </td>
                   <td className="p-4">
                     <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => openDetailModal(tenant)}
+                        className="px-3 py-1 text-sm text-[#FFA317] hover:bg-[#FFA317]/10 rounded font-bold"
+                      >
+                        View
+                      </button>
                       {tenant.is_active ? (
                         <>
                           <button
@@ -678,6 +763,15 @@ const TenantsPage = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Tenant Detail Modal */}
+      {showDetailModal && selectedTenantForDetail && (
+        <TenantDetailModal
+          tenant={selectedTenantForDetail}
+          onClose={handleDetailModalClose}
+          onUpdate={handleDetailModalUpdate}
+        />
       )}
     </div>
   );
