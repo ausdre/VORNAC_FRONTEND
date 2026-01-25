@@ -32,6 +32,13 @@ const UsersPage = () => {
   });
   const [error, setError] = useState('');
 
+  // Sorting and filtering state
+  const [sortColumn, setSortColumn] = useState('email');
+  const [sortDirection, setSortDirection] = useState('asc');
+  const [tenantFilter, setTenantFilter] = useState('all');
+  const [mfaFilter, setMfaFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+
   const fetchUsers = async () => {
     setLoading(true);
     try {
@@ -137,6 +144,88 @@ const UsersPage = () => {
     return 'text-white/60 bg-white/5';
   };
 
+  // Sorting function
+  const handleSort = (column) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
+
+  // Filter and sort users
+  const getFilteredAndSortedUsers = () => {
+    let filtered = [...users];
+
+    // Apply tenant filter
+    if (tenantFilter !== 'all') {
+      if (tenantFilter === 'none') {
+        filtered = filtered.filter(u => !u.tenant_id);
+      } else {
+        filtered = filtered.filter(u => u.tenant_id === parseInt(tenantFilter));
+      }
+    }
+
+    // Apply MFA filter
+    if (mfaFilter !== 'all') {
+      filtered = filtered.filter(u =>
+        mfaFilter === 'enabled' ? u.mfa_enabled : !u.mfa_enabled
+      );
+    }
+
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(u =>
+        statusFilter === 'active' ? u.is_active : !u.is_active
+      );
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      let aVal, bVal;
+
+      switch (sortColumn) {
+        case 'email':
+          aVal = a.email.toLowerCase();
+          bVal = b.email.toLowerCase();
+          break;
+        case 'name':
+          aVal = `${a.first_name} ${a.last_name}`.toLowerCase();
+          bVal = `${b.first_name} ${b.last_name}`.toLowerCase();
+          break;
+        case 'tenant':
+          aVal = a.tenant_name?.toLowerCase() || '';
+          bVal = b.tenant_name?.toLowerCase() || '';
+          break;
+        case 'role':
+          const roleOrder = { super_admin: 3, admin: 2, user: 1 };
+          aVal = roleOrder[a.role] || 0;
+          bVal = roleOrder[b.role] || 0;
+          break;
+        case 'mfa':
+          aVal = a.mfa_enabled ? 1 : 0;
+          bVal = b.mfa_enabled ? 1 : 0;
+          break;
+        default:
+          return 0;
+      }
+
+      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return filtered;
+  };
+
+  const SortIcon = ({ column }) => {
+    if (sortColumn !== column) {
+      return <span className="text-white/20 ml-1">⇅</span>;
+    }
+    return <span className="text-[#FFA317] ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>;
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
@@ -162,26 +251,79 @@ const UsersPage = () => {
         </button>
       </div>
 
-      {/* Filters */}
-      <div className="mb-6 flex gap-4">
+      {/* Search and Filters */}
+      <div className="mb-6 flex gap-4 flex-wrap items-center">
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search users..."
-          className="flex-1 max-w-md bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder:text-white/40 focus:border-[#FFA317] focus:outline-none"
+          className="flex-1 min-w-[300px] bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder:text-white/40 focus:border-[#FFA317] focus:outline-none"
         />
+
+        <select
+          value={tenantFilter}
+          onChange={(e) => setTenantFilter(e.target.value)}
+          className="bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-[#FFA317] focus:outline-none"
+        >
+          <option value="all">All Tenants</option>
+          <option value="none">No Tenant (Super Admins)</option>
+          {tenants.map((tenant) => (
+            <option key={tenant.id} value={tenant.id}>{tenant.name}</option>
+          ))}
+        </select>
+
         <select
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value)}
           className="bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-[#FFA317] focus:outline-none"
         >
-          <option value="" className="bg-[#0a0b14] text-white">All Roles</option>
-          <option value="super_admin" className="bg-[#0a0b14] text-white">Super Admin</option>
-          <option value="admin" className="bg-[#0a0b14] text-white">Admin</option>
-          <option value="user" className="bg-[#0a0b14] text-white">User</option>
+          <option value="">All Roles</option>
+          <option value="super_admin">Super Admin</option>
+          <option value="admin">Admin</option>
+          <option value="user">User</option>
         </select>
+
+        <select
+          value={mfaFilter}
+          onChange={(e) => setMfaFilter(e.target.value)}
+          className="bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-[#FFA317] focus:outline-none"
+        >
+          <option value="all">All MFA Status</option>
+          <option value="enabled">MFA Enabled</option>
+          <option value="disabled">MFA Not Enabled</option>
+        </select>
+
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-[#FFA317] focus:outline-none"
+        >
+          <option value="all">All Status</option>
+          <option value="active">Active Only</option>
+          <option value="inactive">Inactive Only</option>
+        </select>
+
+        <button
+          onClick={() => {
+            setTenantFilter('all');
+            setRoleFilter('');
+            setMfaFilter('all');
+            setStatusFilter('all');
+            setSearch('');
+          }}
+          className="px-4 py-2 text-sm text-white/60 hover:text-white border border-white/10 rounded-lg hover:bg-white/5"
+        >
+          Clear Filters
+        </button>
       </div>
+
+      {/* Results count */}
+      {!loading && users.length > 0 && (
+        <div className="mb-4 text-white/60 text-sm">
+          Showing {getFilteredAndSortedUsers().length} of {users.length} users
+        </div>
+      )}
 
       {/* Table */}
       <div className="bg-[#0a0b14] border border-white/10 rounded-xl overflow-hidden">
@@ -189,20 +331,47 @@ const UsersPage = () => {
           <div className="p-8 text-center text-white/40">Loading...</div>
         ) : users.length === 0 ? (
           <div className="p-8 text-center text-white/40">No users found</div>
+        ) : getFilteredAndSortedUsers().length === 0 ? (
+          <div className="p-8 text-center text-white/40">No users match the current filters</div>
         ) : (
           <table className="w-full">
             <thead className="bg-white/5">
               <tr>
-                <th className="text-left p-4 text-white/60 text-sm font-bold">Email</th>
-                <th className="text-left p-4 text-white/60 text-sm font-bold">Name</th>
-                <th className="text-left p-4 text-white/60 text-sm font-bold">Tenant</th>
-                <th className="text-left p-4 text-white/60 text-sm font-bold">Role</th>
-                <th className="text-left p-4 text-white/60 text-sm font-bold">MFA</th>
+                <th
+                  onClick={() => handleSort('email')}
+                  className="text-left p-4 text-white/60 text-sm font-bold cursor-pointer hover:text-white transition-colors"
+                >
+                  Email <SortIcon column="email" />
+                </th>
+                <th
+                  onClick={() => handleSort('name')}
+                  className="text-left p-4 text-white/60 text-sm font-bold cursor-pointer hover:text-white transition-colors"
+                >
+                  Name <SortIcon column="name" />
+                </th>
+                <th
+                  onClick={() => handleSort('tenant')}
+                  className="text-left p-4 text-white/60 text-sm font-bold cursor-pointer hover:text-white transition-colors"
+                >
+                  Tenant <SortIcon column="tenant" />
+                </th>
+                <th
+                  onClick={() => handleSort('role')}
+                  className="text-left p-4 text-white/60 text-sm font-bold cursor-pointer hover:text-white transition-colors"
+                >
+                  Role <SortIcon column="role" />
+                </th>
+                <th
+                  onClick={() => handleSort('mfa')}
+                  className="text-left p-4 text-white/60 text-sm font-bold cursor-pointer hover:text-white transition-colors"
+                >
+                  MFA <SortIcon column="mfa" />
+                </th>
                 <th className="text-right p-4 text-white/60 text-sm font-bold">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {users.map((user) => (
+              {getFilteredAndSortedUsers().map((user) => (
                 <tr key={user.id} className="hover:bg-white/5">
                   <td className="p-4 text-white">{user.email}</td>
                   <td className="p-4 text-white/60">{user.first_name} {user.last_name}</td>
@@ -250,10 +419,6 @@ const UsersPage = () => {
             </tbody>
           </table>
         )}
-      </div>
-
-      <div className="mt-4 text-white/40 text-sm">
-        Showing {users.length} of {total} users
       </div>
 
       {/* Create User Modal */}
