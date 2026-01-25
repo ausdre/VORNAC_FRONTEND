@@ -13,6 +13,8 @@ import AdminDashboard from './pages/AdminDashboard';
 import TenantsPage from './pages/TenantsPage';
 import UsersPage from './pages/UsersPage';
 import AuditLogsPage from './pages/AuditLogsPage';
+import SSOConfigPage from './pages/SSOConfigPage';
+import KMSConfigPage from './pages/KMSConfigPage';
 
 // Components
 import AdminLayout from './components/AdminLayout';
@@ -63,6 +65,22 @@ const AdminApp = () => {
           element={
             <AdminProtectedRoute>
               <AuditLogsPage />
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/sso"
+          element={
+            <AdminProtectedRoute>
+              <SSOConfigPage />
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/kms"
+          element={
+            <AdminProtectedRoute>
+              <KMSConfigPage />
             </AdminProtectedRoute>
           }
         />
