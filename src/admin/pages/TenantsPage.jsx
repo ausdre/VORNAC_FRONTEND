@@ -33,6 +33,12 @@ const TenantsPage = () => {
   const [selectedTenantForSuspend, setSelectedTenantForSuspend] = useState(null);
   const [suspendReason, setSuspendReason] = useState('');
 
+  // Sorting and filtering state
+  const [sortColumn, setSortColumn] = useState('name');
+  const [sortDirection, setSortDirection] = useState('asc');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [contractFilter, setContractFilter] = useState('all');
+
   const fetchTenants = async () => {
     setLoading(true);
     try {
@@ -168,6 +174,93 @@ const TenantsPage = () => {
     return key.slice(0, 16) + '...';
   };
 
+  // Sorting function
+  const handleSort = (column) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
+
+  // Filter and sort tenants
+  const getFilteredAndSortedTenants = () => {
+    let filtered = [...tenants];
+
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(t =>
+        statusFilter === 'active' ? t.is_active : !t.is_active
+      );
+    }
+
+    // Apply contract filter
+    if (contractFilter === 'expiring') {
+      const thirtyDaysFromNow = new Date();
+      thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+      filtered = filtered.filter(t => {
+        if (!t.contract_end_date) return false;
+        const endDate = new Date(t.contract_end_date);
+        return endDate <= thirtyDaysFromNow && endDate >= new Date();
+      });
+    } else if (contractFilter === 'expired') {
+      filtered = filtered.filter(t => {
+        if (!t.contract_end_date) return false;
+        return new Date(t.contract_end_date) < new Date();
+      });
+    } else if (contractFilter === 'unlimited') {
+      filtered = filtered.filter(t => !t.contract_end_date);
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      let aVal, bVal;
+
+      switch (sortColumn) {
+        case 'name':
+          aVal = a.name.toLowerCase();
+          bVal = b.name.toLowerCase();
+          break;
+        case 'status':
+          aVal = a.is_active ? 1 : 0;
+          bVal = b.is_active ? 1 : 0;
+          break;
+        case 'users':
+          aVal = a.user_count || 0;
+          bVal = b.user_count || 0;
+          break;
+        case 'pentests':
+          aVal = a.pentest_count || 0;
+          bVal = b.pentest_count || 0;
+          break;
+        case 'cost':
+          aVal = parseFloat(a.cost_per_pentest) || 0;
+          bVal = parseFloat(b.cost_per_pentest) || 0;
+          break;
+        case 'contract':
+          aVal = a.contract_end_date ? new Date(a.contract_end_date).getTime() : Infinity;
+          bVal = b.contract_end_date ? new Date(b.contract_end_date).getTime() : Infinity;
+          break;
+        default:
+          return 0;
+      }
+
+      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return filtered;
+  };
+
+  const SortIcon = ({ column }) => {
+    if (sortColumn !== column) {
+      return <span className="text-white/20 ml-1">⇅</span>;
+    }
+    return <span className="text-[#FFA317] ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>;
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
@@ -186,16 +279,55 @@ const TenantsPage = () => {
         </button>
       </div>
 
-      {/* Search */}
-      <div className="mb-6">
+      {/* Search and Filters */}
+      <div className="mb-6 flex gap-4 flex-wrap items-center">
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search tenants..."
-          className="w-full max-w-md bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder:text-white/40 focus:border-[#FFA317] focus:outline-none"
+          className="flex-1 min-w-[300px] bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder:text-white/40 focus:border-[#FFA317] focus:outline-none"
         />
+
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-[#FFA317] focus:outline-none"
+        >
+          <option value="all">All Status</option>
+          <option value="active">Active Only</option>
+          <option value="suspended">Suspended Only</option>
+        </select>
+
+        <select
+          value={contractFilter}
+          onChange={(e) => setContractFilter(e.target.value)}
+          className="bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-[#FFA317] focus:outline-none"
+        >
+          <option value="all">All Contracts</option>
+          <option value="expiring">Expiring Soon (30d)</option>
+          <option value="expired">Expired</option>
+          <option value="unlimited">Unlimited</option>
+        </select>
+
+        <button
+          onClick={() => {
+            setStatusFilter('all');
+            setContractFilter('all');
+            setSearch('');
+          }}
+          className="px-4 py-2 text-sm text-white/60 hover:text-white border border-white/10 rounded-lg hover:bg-white/5"
+        >
+          Clear Filters
+        </button>
       </div>
+
+      {/* Results count */}
+      {!loading && tenants.length > 0 && (
+        <div className="mb-4 text-white/60 text-sm">
+          Showing {getFilteredAndSortedTenants().length} of {tenants.length} tenants
+        </div>
+      )}
 
       {/* Table */}
       <div className="bg-[#0a0b14] border border-white/10 rounded-xl overflow-hidden">
@@ -203,22 +335,54 @@ const TenantsPage = () => {
           <div className="p-8 text-center text-white/40">Loading...</div>
         ) : tenants.length === 0 ? (
           <div className="p-8 text-center text-white/40">No tenants found</div>
+        ) : getFilteredAndSortedTenants().length === 0 ? (
+          <div className="p-8 text-center text-white/40">No tenants match the current filters</div>
         ) : (
           <table className="w-full">
             <thead className="bg-white/5">
               <tr>
-                <th className="text-left p-4 text-white/60 text-sm font-bold">Name</th>
-                <th className="text-left p-4 text-white/60 text-sm font-bold">Status</th>
+                <th
+                  onClick={() => handleSort('name')}
+                  className="text-left p-4 text-white/60 text-sm font-bold cursor-pointer hover:text-white transition-colors"
+                >
+                  Name <SortIcon column="name" />
+                </th>
+                <th
+                  onClick={() => handleSort('status')}
+                  className="text-left p-4 text-white/60 text-sm font-bold cursor-pointer hover:text-white transition-colors"
+                >
+                  Status <SortIcon column="status" />
+                </th>
                 <th className="text-left p-4 text-white/60 text-sm font-bold">API Key</th>
-                <th className="text-left p-4 text-white/60 text-sm font-bold">Users</th>
-                <th className="text-left p-4 text-white/60 text-sm font-bold">Pentests</th>
-                <th className="text-left p-4 text-white/60 text-sm font-bold">Cost/Pentest</th>
-                <th className="text-left p-4 text-white/60 text-sm font-bold">Contract End</th>
+                <th
+                  onClick={() => handleSort('users')}
+                  className="text-left p-4 text-white/60 text-sm font-bold cursor-pointer hover:text-white transition-colors"
+                >
+                  Users <SortIcon column="users" />
+                </th>
+                <th
+                  onClick={() => handleSort('pentests')}
+                  className="text-left p-4 text-white/60 text-sm font-bold cursor-pointer hover:text-white transition-colors"
+                >
+                  Pentests <SortIcon column="pentests" />
+                </th>
+                <th
+                  onClick={() => handleSort('cost')}
+                  className="text-left p-4 text-white/60 text-sm font-bold cursor-pointer hover:text-white transition-colors"
+                >
+                  Cost/Pentest <SortIcon column="cost" />
+                </th>
+                <th
+                  onClick={() => handleSort('contract')}
+                  className="text-left p-4 text-white/60 text-sm font-bold cursor-pointer hover:text-white transition-colors"
+                >
+                  Contract End <SortIcon column="contract" />
+                </th>
                 <th className="text-right p-4 text-white/60 text-sm font-bold">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {tenants.map((tenant) => (
+              {getFilteredAndSortedTenants().map((tenant) => (
                 <tr key={tenant.id} className={`hover:bg-white/5 ${!tenant.is_active ? 'opacity-60' : ''}`}>
                   <td className="p-4 font-medium text-white">{tenant.name}</td>
                   <td className="p-4">
