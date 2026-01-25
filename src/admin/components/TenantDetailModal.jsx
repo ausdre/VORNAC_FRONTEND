@@ -3,7 +3,7 @@
  * Comprehensive tenant view with integrated SSO and KMS configuration
  */
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import adminClient from '../api/client';
 import {
   regenerateTenantAPIKey,
   suspendTenant,
@@ -83,7 +83,7 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
   const loadConfigurations = async () => {
     try {
       // Load SSO config
-      const ssoRes = await axios.get('http://localhost:8000/api/v1/admin/sso/configurations');
+      const ssoRes = await adminClient.get('/sso/configurations');
       const tenantSso = ssoRes.data.find(c => c.tenant_id === tenant.id);
       if (tenantSso) {
         setSsoConfig(tenantSso);
@@ -98,7 +98,7 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
       }
 
       // Load KMS config
-      const kmsRes = await axios.get('http://localhost:8000/api/v1/admin/kms/configurations');
+      const kmsRes = await adminClient.get('/kms/configurations');
       const tenantKms = kmsRes.data.find(c => c.tenant_id === tenant.id);
       if (tenantKms) {
         setKmsConfig(tenantKms);
@@ -106,7 +106,7 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
 
       // Load tenant users
       try {
-        const usersRes = await axios.get(`http://localhost:8000/api/v1/admin/users?tenant_id=${tenant.id}`);
+        const usersRes = await adminClient.get(`/users?tenant_id=${tenant.id}`);
         setTenantUsers(usersRes.data.users || []);
       } catch (usersErr) {
         console.error('Failed to load users:', usersErr);
@@ -180,7 +180,7 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
         annual_arr: tenantData.annual_arr === '' ? null : parseFloat(tenantData.annual_arr)
       };
 
-      await axios.put(`http://localhost:8000/api/v1/admin/tenants/${tenant.id}`, payload);
+      await adminClient.put(`/tenants/${tenant.id}`, payload);
       onUpdate();
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to update tenant');
@@ -195,14 +195,14 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
     try {
       if (ssoConfig) {
         // Update existing
-        await axios.put(`http://localhost:8000/api/v1/admin/sso/configurations/${ssoConfig.id}`, ssoData);
+        await adminClient.put(`/sso/configurations/${ssoConfig.id}`, ssoData);
       } else {
         // Create new
         const payload = {
           tenant_id: tenant.id,
           ...ssoData
         };
-        const response = await axios.post('http://localhost:8000/api/v1/admin/sso/configurations', payload);
+        const response = await adminClient.post('/sso/configurations', payload);
         setSsoConfig(response.data);
       }
       loadConfigurations();
@@ -217,7 +217,7 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
   const handleEnableSSO = async () => {
     if (!ssoConfig) return;
     try {
-      await axios.put(`http://localhost:8000/api/v1/admin/sso/configurations/${ssoConfig.id}/enable`);
+      await adminClient.put(`/sso/configurations/${ssoConfig.id}/enable`);
       loadConfigurations();
     } catch (err) {
       alert('Failed to enable SSO: ' + err.message);
@@ -227,7 +227,7 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
   const handleDisableSSO = async () => {
     if (!ssoConfig) return;
     try {
-      await axios.put(`http://localhost:8000/api/v1/admin/sso/configurations/${ssoConfig.id}/disable`);
+      await adminClient.put(`/sso/configurations/${ssoConfig.id}/disable`);
       loadConfigurations();
     } catch (err) {
       alert('Failed to disable SSO: ' + err.message);
@@ -280,9 +280,9 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
       };
 
       if (kmsConfig) {
-        await axios.put(`http://localhost:8000/api/v1/admin/kms/configurations/${kmsConfig.id}`, payload);
+        await adminClient.put(`/kms/configurations/${kmsConfig.id}`, payload);
       } else {
-        const response = await axios.post('http://localhost:8000/api/v1/admin/kms/configurations', payload);
+        const response = await adminClient.post('/kms/configurations', payload);
         setKmsConfig(response.data);
       }
       loadConfigurations();
@@ -297,7 +297,7 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
   const handleTestKMS = async () => {
     if (!kmsConfig) return;
     try {
-      const response = await axios.post(`http://localhost:8000/api/v1/admin/kms/configurations/${kmsConfig.id}/test`);
+      const response = await adminClient.post(`/kms/configurations/${kmsConfig.id}/test`);
       if (response.data.success) {
         alert('✅ KMS connection test successful!');
       } else {
@@ -311,7 +311,7 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
   const handleEnableKMS = async () => {
     if (!kmsConfig) return;
     try {
-      await axios.put(`http://localhost:8000/api/v1/admin/kms/configurations/${kmsConfig.id}/enable`);
+      await adminClient.put(`/kms/configurations/${kmsConfig.id}/enable`);
       loadConfigurations();
     } catch (err) {
       alert('Failed to enable KMS: ' + err.message);
