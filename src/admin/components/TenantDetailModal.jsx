@@ -10,6 +10,7 @@ import {
   unsuspendTenant,
   deleteTenant
 } from '../api/tenants';
+import { listUsers, createUser, updateUser } from '../api/users';
 
 export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
   const [activeTab, setActiveTab] = useState('overview');
@@ -21,6 +22,19 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
   const [showSuspendForm, setShowSuspendForm] = useState(false);
   const [suspendReason, setSuspendReason] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
+
+  // Add user modal state
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [addUserMode, setAddUserMode] = useState('existing'); // 'existing' | 'new'
+  const [availableUsers, setAvailableUsers] = useState([]);
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [newUserData, setNewUserData] = useState({
+    email: '',
+    firstName: '',
+    lastName: '',
+    role: 'user',
+    password: ''
+  });
 
   // Close on ESC key
   useEffect(() => {
@@ -114,6 +128,83 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
     } catch (err) {
       console.error('Failed to load configurations:', err);
     }
+  };
+
+  // Load users that can be assigned to this tenant (users without a tenant or from other tenants)
+  const loadAvailableUsers = async () => {
+    try {
+      const response = await listUsers({ page: 1, pageSize: 200 });
+      // Filter out users already in this tenant and super_admins
+      const available = response.users.filter(
+        u => u.tenant_id !== tenant.id && u.role !== 'super_admin'
+      );
+      setAvailableUsers(available);
+    } catch (err) {
+      console.error('Failed to load available users:', err);
+    }
+  };
+
+  // Assign existing user to this tenant
+  const handleAssignUserToTenant = async () => {
+    if (!selectedUserId) return;
+    setLoading(true);
+    setError('');
+    try {
+      await updateUser(selectedUserId, { tenant_id: tenant.id });
+      setShowAddUserModal(false);
+      setSelectedUserId('');
+      loadConfigurations();
+      onUpdate();
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to assign user');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Create new user for this tenant
+  const handleCreateUserForTenant = async () => {
+    if (!newUserData.email || !newUserData.firstName || !newUserData.lastName) {
+      setError('Email, first name, and last name are required');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const payload = {
+        email: newUserData.email,
+        first_name: newUserData.firstName,
+        last_name: newUserData.lastName,
+        role: newUserData.role,
+        tenant_id: tenant.id,
+        password: newUserData.password || undefined
+      };
+      const response = await createUser(payload);
+
+      if (response.generated_password) {
+        alert(`User created!\n\nGenerated Password: ${response.generated_password}\n\nCopy and save - won't be shown again!`);
+      }
+
+      setShowAddUserModal(false);
+      resetNewUserForm();
+      loadConfigurations();
+      onUpdate();
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to create user');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetNewUserForm = () => {
+    setNewUserData({
+      email: '',
+      firstName: '',
+      lastName: '',
+      role: 'user',
+      password: ''
+    });
+    setError('');
   };
 
   const handleRegenerateAPIKey = async () => {
@@ -686,6 +777,17 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-white font-bold">Tenant Users ({tenantUsers.length})</h3>
+                <button
+                  onClick={() => {
+                    loadAvailableUsers();
+                    setShowAddUserModal(true);
+                    setAddUserMode('existing');
+                    setError('');
+                  }}
+                  className="px-4 py-2 bg-[#FFA317] text-black font-bold rounded hover:bg-white transition-colors text-sm"
+                >
+                  + Add User
+                </button>
               </div>
 
               {tenantUsers.length === 0 ? (
@@ -741,9 +843,163 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
                 </div>
               )}
 
-              <p className="text-white/40 text-xs">
-                Manage users from the Users page in the admin panel.
-              </p>
+              {/* Add User Modal */}
+              {showAddUserModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+                  <div className="bg-[#0a0b14] border border-white/10 rounded-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+                    <h3 className="text-white font-bold text-lg mb-4">Add User to {tenant.name}</h3>
+
+                    {error && (
+                      <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded text-red-500 text-sm">
+                        {error}
+                      </div>
+                    )}
+
+                    {/* Mode Toggle */}
+                    <div className="flex gap-2 mb-4">
+                      <button
+                        onClick={() => {
+                          setAddUserMode('existing');
+                          setError('');
+                        }}
+                        className={`flex-1 py-2 rounded text-sm font-bold transition-colors ${
+                          addUserMode === 'existing'
+                            ? 'bg-[#FFA317] text-black'
+                            : 'bg-white/10 text-white/60 hover:text-white'
+                        }`}
+                      >
+                        Assign Existing
+                      </button>
+                      <button
+                        onClick={() => {
+                          setAddUserMode('new');
+                          setError('');
+                        }}
+                        className={`flex-1 py-2 rounded text-sm font-bold transition-colors ${
+                          addUserMode === 'new'
+                            ? 'bg-[#FFA317] text-black'
+                            : 'bg-white/10 text-white/60 hover:text-white'
+                        }`}
+                      >
+                        Create New
+                      </button>
+                    </div>
+
+                    {/* Assign Existing User */}
+                    {addUserMode === 'existing' && (
+                      <div>
+                        <label className="block text-white/60 text-sm mb-2">Select User</label>
+                        <select
+                          value={selectedUserId}
+                          onChange={(e) => setSelectedUserId(e.target.value)}
+                          className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white mb-4 focus:border-[#FFA317] focus:outline-none"
+                        >
+                          <option value="" className="bg-[#0a0b14]">Choose a user...</option>
+                          {availableUsers.length === 0 ? (
+                            <option value="" disabled className="bg-[#0a0b14]">No available users</option>
+                          ) : (
+                            availableUsers.map(u => (
+                              <option key={u.id} value={u.id} className="bg-[#0a0b14]">
+                                {u.email} ({u.first_name} {u.last_name}){u.tenant_name ? ` - ${u.tenant_name}` : ''}
+                              </option>
+                            ))
+                          )}
+                        </select>
+                        {availableUsers.length === 0 && (
+                          <p className="text-white/40 text-xs mb-4">
+                            No users available to assign. Create a new user instead.
+                          </p>
+                        )}
+                        <button
+                          onClick={handleAssignUserToTenant}
+                          disabled={!selectedUserId || loading}
+                          className="w-full py-2 bg-[#FFA317] text-black font-bold rounded hover:bg-white disabled:opacity-50 transition-colors"
+                        >
+                          {loading ? 'Assigning...' : 'Assign User'}
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Create New User */}
+                    {addUserMode === 'new' && (
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-white/60 text-sm mb-1">Email *</label>
+                          <input
+                            type="email"
+                            value={newUserData.email}
+                            onChange={(e) => setNewUserData({ ...newUserData, email: e.target.value })}
+                            placeholder="user@example.com"
+                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-[#FFA317] focus:outline-none"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-white/60 text-sm mb-1">First Name *</label>
+                            <input
+                              type="text"
+                              value={newUserData.firstName}
+                              onChange={(e) => setNewUserData({ ...newUserData, firstName: e.target.value })}
+                              placeholder="John"
+                              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-[#FFA317] focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-white/60 text-sm mb-1">Last Name *</label>
+                            <input
+                              type="text"
+                              value={newUserData.lastName}
+                              onChange={(e) => setNewUserData({ ...newUserData, lastName: e.target.value })}
+                              placeholder="Doe"
+                              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-[#FFA317] focus:outline-none"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-white/60 text-sm mb-1">Role *</label>
+                          <select
+                            value={newUserData.role}
+                            onChange={(e) => setNewUserData({ ...newUserData, role: e.target.value })}
+                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-[#FFA317] focus:outline-none"
+                          >
+                            <option value="user" className="bg-[#0a0b14]">User</option>
+                            <option value="admin" className="bg-[#0a0b14]">Admin</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-white/60 text-sm mb-1">Password (optional)</label>
+                          <input
+                            type="text"
+                            value={newUserData.password}
+                            onChange={(e) => setNewUserData({ ...newUserData, password: e.target.value })}
+                            placeholder="Leave empty to auto-generate"
+                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white font-mono focus:border-[#FFA317] focus:outline-none"
+                          />
+                          <p className="text-white/40 text-xs mt-1">If empty, a random password will be generated</p>
+                        </div>
+                        <button
+                          onClick={handleCreateUserForTenant}
+                          disabled={loading}
+                          className="w-full py-2 bg-[#FFA317] text-black font-bold rounded hover:bg-white disabled:opacity-50 transition-colors"
+                        >
+                          {loading ? 'Creating...' : 'Create User'}
+                        </button>
+                      </div>
+                    )}
+
+                    <button
+                      onClick={() => {
+                        setShowAddUserModal(false);
+                        setSelectedUserId('');
+                        resetNewUserForm();
+                      }}
+                      className="w-full mt-3 py-2 border border-white/20 text-white rounded hover:bg-white/5 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

@@ -12,6 +12,7 @@ import {
   resetUserMFA
 } from '../api/users';
 import { listTenants } from '../api/tenants';
+import UserDetailModal from '../components/UserDetailModal';
 
 const UsersPage = () => {
   const [users, setUsers] = useState([]);
@@ -31,6 +32,10 @@ const UsersPage = () => {
     password: ''
   });
   const [error, setError] = useState('');
+
+  // Detail modal state
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
 
   // Sorting and filtering state
   const [sortColumn, setSortColumn] = useState('email');
@@ -226,6 +231,21 @@ const UsersPage = () => {
     return <span className="text-[#FFA317] ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>;
   };
 
+  // Detail modal handlers
+  const openDetailModal = (user) => {
+    setSelectedUser(user);
+    setShowDetailModal(true);
+  };
+
+  const handleDetailModalClose = () => {
+    setShowDetailModal(false);
+    setSelectedUser(null);
+  };
+
+  const handleDetailModalUpdate = () => {
+    fetchUsers();
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
@@ -372,7 +392,11 @@ const UsersPage = () => {
             </thead>
             <tbody className="divide-y divide-white/5">
               {getFilteredAndSortedUsers().map((user) => (
-                <tr key={user.id} className="hover:bg-white/5">
+                <tr
+                  key={user.id}
+                  className="hover:bg-white/5 cursor-pointer transition-colors"
+                  onClick={() => openDetailModal(user)}
+                >
                   <td className="p-4 text-white">{user.email}</td>
                   <td className="p-4 text-white/60">{user.first_name} {user.last_name}</td>
                   <td className="p-4 text-white/60 text-sm">
@@ -390,7 +414,7 @@ const UsersPage = () => {
                       <span className="text-white/30">Not enrolled</span>
                     )}
                   </td>
-                  <td className="p-4">
+                  <td className="p-4" onClick={(e) => e.stopPropagation()}>
                     <div className="flex justify-end gap-2">
                       <button
                         onClick={() => handleResetPassword(user)}
@@ -533,6 +557,16 @@ const UsersPage = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* User Detail Modal */}
+      {showDetailModal && selectedUser && (
+        <UserDetailModal
+          user={selectedUser}
+          tenants={tenants}
+          onClose={handleDetailModalClose}
+          onUpdate={handleDetailModalUpdate}
+        />
       )}
     </div>
   );

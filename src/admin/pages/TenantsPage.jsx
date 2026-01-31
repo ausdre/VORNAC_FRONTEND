@@ -3,7 +3,6 @@
  * CRUD operations for tenants with SSO/KMS integration
  */
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import {
   listTenants,
   createTenant,
@@ -13,6 +12,7 @@ import {
   suspendTenant,
   unsuspendTenant
 } from '../api/tenants';
+import adminClient from '../api/client';
 import TenantDetailModal from '../components/TenantDetailModal';
 
 const TenantsPage = () => {
@@ -93,7 +93,7 @@ const TenantsPage = () => {
   const fetchConfigurations = async () => {
     try {
       // Fetch SSO configs
-      const ssoRes = await axios.get('http://localhost:8000/api/v1/admin/sso/configurations');
+      const ssoRes = await adminClient.get('/sso/configurations');
       const ssoMap = {};
       ssoRes.data.forEach(config => {
         ssoMap[config.tenant_id] = config;
@@ -101,7 +101,7 @@ const TenantsPage = () => {
       setSsoConfigs(ssoMap);
 
       // Fetch KMS configs
-      const kmsRes = await axios.get('http://localhost:8000/api/v1/admin/kms/configurations');
+      const kmsRes = await adminClient.get('/kms/configurations');
       const kmsMap = {};
       kmsRes.data.forEach(config => {
         kmsMap[config.tenant_id] = config;
@@ -148,7 +148,7 @@ const TenantsPage = () => {
       // Create SSO configuration if SSO auth type selected
       if (formData.auth_type === 'sso' && formData.sso_idp_entity_id) {
         try {
-          await axios.post('http://localhost:8000/api/v1/admin/sso/configurations', {
+          await adminClient.post('/sso/configurations', {
             tenant_id: newTenant.id,
             provider: formData.sso_provider,
             idp_entity_id: formData.sso_idp_entity_id,
@@ -170,7 +170,7 @@ const TenantsPage = () => {
             secret_access_key: formData.kms_aws_secret_key
           } : {};
 
-          await axios.post('http://localhost:8000/api/v1/admin/kms/configurations', {
+          await adminClient.post('/kms/configurations', {
             tenant_id: newTenant.id,
             provider: formData.kms_provider,
             kek_id: formData.kms_kek_id,
