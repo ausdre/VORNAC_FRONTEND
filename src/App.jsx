@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import axios from 'axios';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import NewPentest from './pages/NewPentest';
@@ -7,17 +6,11 @@ import Results from './pages/Results';
 import Queue from './pages/Queue';
 import Settings from './pages/Settings';
 import Navbar from './Navbar';
+import { login } from './api/client';
 
 function Login({ setToken }) {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
-
-  const attemptLogin = async (username, password) => {
-    const params = new URLSearchParams();
-    params.append('username', username);
-    params.append('password', password);
-    return axios.post('http://localhost:8000/api/v1/auth/login', params);
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -25,9 +18,9 @@ function Login({ setToken }) {
     setLoading(true);
     try {
       // Use the standard credentials enforced by the backend script
-      const response = await attemptLogin('admin@companya.com', 'password123');
+      const data = await login('admin@companya.com', 'password123');
 
-      const { access_token } = response.data;
+      const { access_token } = data;
       
       localStorage.setItem('access_token', access_token);
       setToken(access_token);
