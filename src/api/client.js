@@ -24,7 +24,13 @@ export const login = async (username, password) => {
   params.append('username', username);
   params.append('password', password);
   
-  const response = await client.post('/auth/login', params);
+  // Explicitly set Content-Type to application/x-www-form-urlencoded
+  // This overrides the default application/json set in the client instance
+  const response = await client.post('/auth/login', params, {
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    }
+  });
   return response.data;
 };
 
