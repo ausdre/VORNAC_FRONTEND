@@ -1,8 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
-import { deleteJob } from '../api/client';
-import { useAuthStore } from '../stores/authStore';
-import { getTargets } from '../api/targets';
+import { getJobs, deleteJob } from '../api/client';
 
 const Results = () => {
   const [jobs, setJobs] = useState([]);
@@ -16,9 +13,6 @@ const Results = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [errorModal, setErrorModal] = useState(null); // { message }
 
-  const { user } = useAuthStore();
-  const tenantId = user?.tenantId;
-
   useEffect(() => {
     fetchJobs();
     const interval = setInterval(fetchJobs, 5000);
@@ -27,14 +21,11 @@ const Results = () => {
 
   const fetchJobs = async () => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await axios.get('http://localhost:8000/api/v1/inference/', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setJobs(response.data);
+      const data = await getJobs();
+      setJobs(data);
 
       // Group pentests by target URL
-      const grouped = await groupPentestsByTarget(response.data);
+      const grouped = groupPentestsByTarget(data);
       setTargets(grouped);
 
       setLoading(false);
@@ -54,33 +45,29 @@ const Results = () => {
     }
   };
 
-  const groupPentestsByTarget = async (pentests) => {
+  const groupPentestsByTarget = (pentests) => {
     const targetMap = {};
 
-    // First, load all targets from backend API
-    try {
-      const savedTargets = await getTargets();
-      savedTargets.forEach(target => {
-        targetMap[target.url] = {
-          id: target.url,
-          name: target.name,
-          url: target.url,
-          description: target.description,
-          pentests: [],
-          pentest_count: 0,
-          findings: {
-            critical: 0,
-            high: 0,
-            medium: 0,
-            low: 0,
-            informational: 0,
-            total: 0
-          }
-        };
-      });
-    } catch (error) {
-      console.error('Failed to fetch targets:', error);
-    }
+    // First, load all targets from localStorage
+    const savedTargets = JSON.parse(localStorage.getItem('pentest_targets') || '[]');
+    savedTargets.forEach(target => {
+      targetMap[target.url] = {
+        id: target.url,
+        name: target.name,
+        url: target.url,
+        description: target.description,
+        pentests: [],
+        pentest_count: 0,
+        findings: {
+          critical: 0,
+          high: 0,
+          medium: 0,
+          low: 0,
+          informational: 0,
+          total: 0
+        }
+      };
+    });
 
     // Then, add pentests to targets
     pentests.forEach(job => {

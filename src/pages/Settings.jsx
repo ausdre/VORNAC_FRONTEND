@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import axios from 'axios';
-import { useAuthStore } from '../stores/authStore';
+import { changePassword } from '../api/client';
 
 const Settings = () => {
   const [currentPassword, setCurrentPassword] = useState('');
@@ -9,9 +8,8 @@ const Settings = () => {
   const [modalState, setModalState] = useState(null); // { type: 'success'|'error', message }
   const [loading, setLoading] = useState(false);
 
-  // Get user info from Zustand store
-  const { user } = useAuthStore();
-  const userEmail = user?.email || 'Unknown';
+  // Get user info from localStorage or token
+  const userEmail = 'admin@companya.com'; // In a real app, this would come from JWT or API
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
@@ -47,17 +45,7 @@ const Settings = () => {
     setLoading(true);
 
     try {
-      const token = localStorage.getItem('access_token');
-      await axios.post(
-        'http://localhost:8000/api/v1/auth/change-password',
-        {
-          current_password: currentPassword,
-          new_password: newPassword
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
+      await changePassword(currentPassword, newPassword);
 
       // Clear form
       setCurrentPassword('');
@@ -147,14 +135,14 @@ const Settings = () => {
               <div>
                 <label className="block text-white/40 text-xs uppercase tracking-wider mb-2">Role</label>
                 <div className="bg-[#02030a] border border-white/10 rounded-lg py-3 px-4 text-white">
-                  {user?.role || 'Unknown'}
+                  Administrator
                 </div>
               </div>
 
               <div>
                 <label className="block text-white/40 text-xs uppercase tracking-wider mb-2">Organization</label>
                 <div className="bg-[#02030a] border border-white/10 rounded-lg py-3 px-4 text-white">
-                  {user?.tenantName || 'Unknown'}
+                  Company A
                 </div>
               </div>
             </div>

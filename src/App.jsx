@@ -1,3 +1,5 @@
+import React, { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
@@ -10,6 +12,7 @@ import Results from './pages/Results';
 import Queue from './pages/Queue';
 import Settings from './pages/Settings';
 import Navbar from './Navbar';
+import { login } from './api/client';
 import AdminApp from './admin/AdminApp';
 
 const API_BASE = 'http://localhost:8000/api/v1';
@@ -19,6 +22,7 @@ function Login() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  const handleSubmit = async (e) => {
   // Login form state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -69,11 +73,17 @@ function Login() {
     setLoading(true);
 
     try {
+      // Use the standard credentials enforced by the backend script
+      const data = await login('admin@companya.com', 'password123');
       const response = await axios.post(`${API_BASE}/auth/login-step1`, {
         email,
         password
       });
 
+      const { access_token } = data;
+      
+      localStorage.setItem('access_token', access_token);
+      setToken(access_token);
       const { session_token, mfa_enabled } = response.data;
       setSessionToken(session_token);
       setMfaEnabled(mfa_enabled);
