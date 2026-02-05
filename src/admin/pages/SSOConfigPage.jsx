@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import adminClient from '../api/client';
 
 export default function SSOConfigPage() {
   const [configs, setConfigs] = useState([]);
@@ -24,8 +24,8 @@ export default function SSOConfigPage() {
     setLoading(true);
     try {
       const [configsRes, tenantsRes] = await Promise.all([
-        axios.get('http://localhost:8000/api/v1/admin/sso/configurations'),
-        axios.get('http://localhost:8000/api/v1/admin/tenants')
+        adminClient.get('/sso/configurations'),
+        adminClient.get('/tenants')
       ]);
       setConfigs(configsRes.data);
       setTenants(tenantsRes.data.tenants || []);
@@ -42,7 +42,7 @@ export default function SSOConfigPage() {
     setError('');
 
     try {
-      await axios.post('http://localhost:8000/api/v1/admin/sso/configurations', formData);
+      await adminClient.post('/sso/configurations', formData);
       setShowModal(false);
       setFormData({
         tenant_id: '',
@@ -60,7 +60,7 @@ export default function SSOConfigPage() {
 
   const handleEnable = async (configId) => {
     try {
-      await axios.put(`http://localhost:8000/api/v1/admin/sso/configurations/${configId}/enable`);
+      await adminClient.put(`/sso/configurations/${configId}/enable`);
       loadData();
     } catch (err) {
       alert('Failed to enable SSO: ' + (err.response?.data?.detail || err.message));
@@ -69,7 +69,7 @@ export default function SSOConfigPage() {
 
   const handleDisable = async (configId) => {
     try {
-      await axios.put(`http://localhost:8000/api/v1/admin/sso/configurations/${configId}/disable`);
+      await adminClient.put(`/sso/configurations/${configId}/disable`);
       loadData();
     } catch (err) {
       alert('Failed to disable SSO: ' + (err.response?.data?.detail || err.message));
@@ -80,7 +80,7 @@ export default function SSOConfigPage() {
     if (!confirm('Are you sure you want to delete this SSO configuration?')) return;
 
     try {
-      await axios.delete(`http://localhost:8000/api/v1/admin/sso/configurations/${configId}`);
+      await adminClient.delete(`/sso/configurations/${configId}`);
       loadData();
     } catch (err) {
       alert('Failed to delete SSO configuration: ' + (err.response?.data?.detail || err.message));
@@ -88,7 +88,14 @@ export default function SSOConfigPage() {
   };
 
   const getMetadataUrl = (tenantId) => {
-    return `http://localhost:8000/api/v1/sso/auth/metadata/${tenantId}`;
+    // This needs to be the full URL for the user to click/copy
+    const baseUrl = (import.meta.env.DEV) ? 'http://localhost:8000/api/v1' : 'https://c2.vornac.store/api/v1';
+    return `${baseUrl}/sso/auth/metadata/${tenantId}`;
+  };
+
+  const getAcsUrl = () => {
+    const baseUrl = (import.meta.env.DEV) ? 'http://localhost:8000/api/v1' : 'https://c2.vornac.store/api/v1';
+    return `${baseUrl}/sso/auth/acs`;
   };
 
   const providerLabels = {
@@ -319,7 +326,7 @@ export default function SSOConfigPage() {
               <div className="mb-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
                 <p className="text-blue-400 text-sm font-bold mb-2">Configure in your IdP:</p>
                 <div className="space-y-1 text-sm text-white/60 font-mono">
-                  <p>ACS URL: http://localhost:8000/api/v1/sso/auth/acs</p>
+                  <p>ACS URL: {getAcsUrl()}</p>
                   <p>Entity ID: https://vornac.com/saml/sp/{'{tenant_id}'}</p>
                   <p>NameID Format: Email Address</p>
                 </div>

@@ -6,8 +6,9 @@
 import axios from 'axios';
 import { useAdminAuthStore } from '../stores/adminAuthStore';
 
+// Use relative path to leverage Vite proxy (dev) and Vercel rewrites (prod)
 const adminClient = axios.create({
-  baseURL: 'http://localhost:8000/api/v1/admin',
+  baseURL: '/api/v1/admin',
   headers: {
     'Content-Type': 'application/json'
   }

@@ -1,33 +1,21 @@
-import axios from 'axios';
-
-const API_BASE_URL = 'http://localhost:8000/api/v1';
-
-// Get auth token from localStorage
-const getAuthHeaders = () => {
-  const token = localStorage.getItem('access_token');
-  return {
-    headers: {
-      Authorization: `Bearer ${token}`
-    }
-  };
-};
+import client from './client';
 
 export const getQueueItems = async () => {
-  const response = await axios.get(`${API_BASE_URL}/queue/`, getAuthHeaders());
+  const response = await client.get('/queue/');
   return response.data;
 };
 
 export const createQueueItem = async (queueData) => {
-  const response = await axios.post(`${API_BASE_URL}/queue/`, queueData, getAuthHeaders());
+  const response = await client.post('/queue/', queueData);
   return response.data;
 };
 
 export const updateQueueItem = async (queueId, queueData) => {
-  const response = await axios.patch(`${API_BASE_URL}/queue/${queueId}`, queueData, getAuthHeaders());
+  const response = await client.patch(`/queue/${queueId}`, queueData);
   return response.data;
 };
 
 export const deleteQueueItem = async (queueId) => {
-  const response = await axios.delete(`${API_BASE_URL}/queue/${queueId}`, getAuthHeaders());
+  const response = await client.delete(`/queue/${queueId}`);
   return response.data;
 };

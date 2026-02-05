@@ -4,7 +4,8 @@
  */
 import axios from 'axios';
 
-const BASE_URL = 'http://localhost:8000/api/v1/admin/auth';
+// Use relative path to leverage Vite proxy (dev) and Vercel rewrites (prod)
+const BASE_URL = '/api/v1/admin/auth';
 
 /**
  * Step 1: Login with credentials

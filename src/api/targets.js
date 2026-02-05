@@ -1,33 +1,21 @@
-import axios from 'axios';
-
-const API_BASE_URL = 'http://localhost:8000/api/v1';
-
-// Get auth token from localStorage
-const getAuthHeaders = () => {
-  const token = localStorage.getItem('access_token');
-  return {
-    headers: {
-      Authorization: `Bearer ${token}`
-    }
-  };
-};
+import client from './client';
 
 export const getTargets = async () => {
-  const response = await axios.get(`${API_BASE_URL}/targets/`, getAuthHeaders());
+  const response = await client.get('/targets/');
   return response.data;
 };
 
 export const createTarget = async (targetData) => {
-  const response = await axios.post(`${API_BASE_URL}/targets/`, targetData, getAuthHeaders());
+  const response = await client.post('/targets/', targetData);
   return response.data;
 };
 
 export const updateTarget = async (targetId, targetData) => {
-  const response = await axios.put(`${API_BASE_URL}/targets/${targetId}`, targetData, getAuthHeaders());
+  const response = await client.put(`/targets/${targetId}`, targetData);
   return response.data;
 };
 
 export const deleteTarget = async (targetId) => {
-  const response = await axios.delete(`${API_BASE_URL}/targets/${targetId}`, getAuthHeaders());
+  const response = await client.delete(`/targets/${targetId}`);
   return response.data;
 };

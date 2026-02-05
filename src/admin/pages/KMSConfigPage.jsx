@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import adminClient from '../api/client';
 
 export default function KMSConfigPage() {
   const [configs, setConfigs] = useState([]);
@@ -42,8 +42,8 @@ export default function KMSConfigPage() {
     setLoading(true);
     try {
       const [configsRes, tenantsRes] = await Promise.all([
-        axios.get('http://localhost:8000/api/v1/admin/kms/configurations'),
-        axios.get('http://localhost:8000/api/v1/admin/tenants')
+        adminClient.get('/kms/configurations'),
+        adminClient.get('/tenants')
       ]);
       setConfigs(configsRes.data);
       setTenants(tenantsRes.data.tenants || []);
@@ -101,7 +101,7 @@ export default function KMSConfigPage() {
         byok_enabled: formData.byok_enabled
       };
 
-      await axios.post('http://localhost:8000/api/v1/admin/kms/configurations', payload);
+      await adminClient.post('/kms/configurations', payload);
       setShowModal(false);
       resetForm();
       loadData();
@@ -137,8 +137,8 @@ export default function KMSConfigPage() {
   const handleTest = async (configId) => {
     setTesting(configId);
     try {
-      const response = await axios.post(
-        `http://localhost:8000/api/v1/admin/kms/configurations/${configId}/test`
+      const response = await adminClient.post(
+        `/kms/configurations/${configId}/test`
       );
       if (response.data.success) {
         alert('✅ KMS connection test successful!');
@@ -154,7 +154,7 @@ export default function KMSConfigPage() {
 
   const handleEnable = async (configId) => {
     try {
-      await axios.put(`http://localhost:8000/api/v1/admin/kms/configurations/${configId}/enable`);
+      await adminClient.put(`/kms/configurations/${configId}/enable`);
       loadData();
     } catch (err) {
       alert('Failed to enable KMS: ' + (err.response?.data?.detail || err.message));
@@ -163,7 +163,7 @@ export default function KMSConfigPage() {
 
   const handleDisable = async (configId) => {
     try {
-      await axios.put(`http://localhost:8000/api/v1/admin/kms/configurations/${configId}/disable`);
+      await adminClient.put(`/kms/configurations/${configId}/disable`);
       loadData();
     } catch (err) {
       alert('Failed to disable KMS: ' + (err.response?.data?.detail || err.message));
@@ -174,7 +174,7 @@ export default function KMSConfigPage() {
     if (!confirm('Are you sure? This will prevent decryption of existing encrypted data!')) return;
 
     try {
-      await axios.delete(`http://localhost:8000/api/v1/admin/kms/configurations/${configId}`);
+      await adminClient.delete(`/kms/configurations/${configId}`);
       loadData();
     } catch (err) {
       alert('Failed to delete KMS configuration: ' + (err.response?.data?.detail || err.message));
