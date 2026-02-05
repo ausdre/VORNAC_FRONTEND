@@ -2,11 +2,9 @@ import axios from 'axios';
 
 const API_URL = (import.meta.env.DEV) ? '/api/v1' : 'https://c2.vornac.store/api/v1';
 
+// Do not set default Content-Type here, let Axios handle it based on the data type
 const client = axios.create({
   baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 // Add JWT to every request if available
@@ -19,18 +17,12 @@ client.interceptors.request.use((config) => {
 });
 
 export const login = async (username, password) => {
-  // Using URLSearchParams to send application/x-www-form-urlencoded
   const params = new URLSearchParams();
   params.append('username', username);
   params.append('password', password);
   
-  // Explicitly set Content-Type to application/x-www-form-urlencoded
-  // This overrides the default application/json set in the client instance
-  const response = await client.post('/auth/login', params, {
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded'
-    }
-  });
+  // Axios automatically sets Content-Type to application/x-www-form-urlencoded for URLSearchParams
+  const response = await client.post('/auth/login', params);
   return response.data;
 };
 
