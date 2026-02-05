@@ -23,7 +23,7 @@ export const login = async (username, password) => {
   formData.append('username', username);
   formData.append('password', password);
   // FastAPI OAuth2PasswordRequestForm expects form data
-  const response = await client.post('/auth/token', formData);
+  const response = await client.post('/auth/login', formData);
   return response.data;
 };
 
