@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import { changePassword } from '../api/client';
 
 const Settings = () => {
   const [currentPassword, setCurrentPassword] = useState('');
@@ -45,17 +45,7 @@ const Settings = () => {
     setLoading(true);
 
     try {
-      const token = localStorage.getItem('access_token');
-      await axios.post(
-        'http://localhost:8000/api/v1/auth/change-password',
-        {
-          current_password: currentPassword,
-          new_password: newPassword
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
+      await changePassword(currentPassword, newPassword);
 
       // Clear form
       setCurrentPassword('');

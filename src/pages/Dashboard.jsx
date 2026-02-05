@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { Link } from 'react-router-dom';
+import { getJobs, checkSystemStatus } from '../api/client';
 
 const Dashboard = () => {
   const [stats, setStats] = useState({
@@ -16,17 +16,12 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const token = localStorage.getItem('access_token');
-
         // 1. Check System Status (Health Check)
-        await axios.get('http://localhost:8000/');
+        await checkSystemStatus();
 
         // 2. Fetch Jobs for operational stats
-        const response = await axios.get('http://localhost:8000/api/v1/inference/', {
-            headers: { Authorization: `Bearer ${token}` }
-        });
+        const jobs = await getJobs();
 
-        const jobs = response.data;
         const active = jobs.find(j => j.status === 'PENDING' || j.status === 'PROCESSING');
         const completed = jobs.filter(j => j.status === 'COMPLETED');
         // Sort by created_at descending (most recent first) and take the first 3

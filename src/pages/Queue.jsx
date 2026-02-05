@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { getJobs } from '../api/client';
 
 const Queue = () => {
   const [activePentest, setActivePentest] = useState(null);
@@ -14,14 +14,8 @@ const Queue = () => {
 
   const fetchQueue = async () => {
     try {
-      const token = localStorage.getItem('access_token');
-
       // Fetch active pentests from API
-      const response = await axios.get('http://localhost:8000/api/v1/inference/', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      const jobs = response.data;
+      const jobs = await getJobs();
       const active = jobs.find(j => j.status === 'PENDING' || j.status === 'PROCESSING');
       setActivePentest(active || null);
 

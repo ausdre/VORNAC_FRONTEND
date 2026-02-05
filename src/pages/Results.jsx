@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
-import { deleteJob } from '../api/client';
+import { getJobs, deleteJob } from '../api/client';
 
 const Results = () => {
   const [jobs, setJobs] = useState([]);
@@ -22,14 +21,11 @@ const Results = () => {
 
   const fetchJobs = async () => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await axios.get('http://localhost:8000/api/v1/inference/', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setJobs(response.data);
+      const data = await getJobs();
+      setJobs(data);
 
       // Group pentests by target URL
-      const grouped = groupPentestsByTarget(response.data);
+      const grouped = groupPentestsByTarget(data);
       setTargets(grouped);
 
       setLoading(false);
