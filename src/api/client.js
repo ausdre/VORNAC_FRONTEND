@@ -2,7 +2,7 @@ import axios from 'axios';
 
 const API_URL = (import.meta.env.DEV) ? '/api/v1' : 'https://c2.vornac.store/api/v1';
 
-// Do not set default Content-Type here, let Axios handle it based on the data type
+// Shared client for JSON-based API calls
 const client = axios.create({
   baseURL: API_URL,
 });
@@ -13,6 +13,10 @@ client.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  // Ensure other requests are JSON
+  if (!config.headers['Content-Type']) {
+    config.headers['Content-Type'] = 'application/json';
+  }
   return config;
 });
 
@@ -20,12 +24,21 @@ export const login = async (username, password) => {
   const params = new URLSearchParams();
   params.append('username', username);
   params.append('password', password);
-  
-  // Axios automatically sets Content-Type to application/x-www-form-urlencoded for URLSearchParams
-  const response = await client.post('/auth/login', params);
+
+  // Construct the full URL for the login endpoint, bypassing the client baseURL
+  const loginUrl = `${(import.meta.env.DEV) ? '' : 'https://c2.vornac.store'}/api/v1/auth/login`;
+
+  // Use a completely separate, raw axios call to ensure no interference from the shared client.
+  // This guarantees the Content-Type is set correctly for this specific request.
+  const response = await axios.post(loginUrl, params, {
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+  });
   return response.data;
 };
 
+// All other functions will use the standard client
 export const changePassword = async (currentPassword, newPassword) => {
   const response = await client.post('/auth/change-password', {
     current_password: currentPassword,
@@ -54,7 +67,6 @@ export const deleteJob = async (jobId) => {
   return response.data;
 };
 
-// Target endpoints
 export const getTargets = async () => {
   const response = await client.get('/targets/');
   return response.data;
