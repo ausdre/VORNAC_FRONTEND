@@ -1,6 +1,9 @@
 import axios from 'axios';
 
-const API_URL = (import.meta.env.DEV) ? '/api/v1' : 'https://c2.vornac.store/api/v1';
+// Always use relative path. 
+// In Dev: Vite proxy handles /api -> http://localhost:8000/api
+// In Prod (Vercel): vercel.json rewrites /api -> https://c2.vornac.store/api
+const API_URL = '/api/v1';
 
 // Shared client for JSON-based API calls
 const client = axios.create({
@@ -25,11 +28,10 @@ export const login = async (username, password) => {
   params.append('username', username);
   params.append('password', password);
 
-  // Construct the full URL for the login endpoint, bypassing the client baseURL
-  const loginUrl = `${(import.meta.env.DEV) ? '' : 'https://c2.vornac.store'}/api/v1/auth/login`;
+  // Use relative path for login as well
+  const loginUrl = '/api/v1/auth/login';
 
   // Use a completely separate, raw axios call to ensure no interference from the shared client.
-  // This guarantees the Content-Type is set correctly for this specific request.
   const response = await axios.post(loginUrl, params, {
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -88,11 +90,8 @@ export const createTarget = async (targetData) => {
 };
 
 export const checkSystemStatus = async () => {
-    if (import.meta.env.DEV) {
-        return getJobs();
-    } else {
-        return axios.get('https://c2.vornac.store/');
-    }
+    // Just check the jobs endpoint as a health check
+    return getJobs();
 };
 
 export default client;
