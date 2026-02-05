@@ -19,11 +19,12 @@ client.interceptors.request.use((config) => {
 });
 
 export const login = async (username, password) => {
-  const formData = new FormData();
-  formData.append('username', username);
-  formData.append('password', password);
-  // FastAPI OAuth2PasswordRequestForm expects form data
-  const response = await client.post('/auth/login', formData);
+  // Using URLSearchParams to send application/x-www-form-urlencoded
+  const params = new URLSearchParams();
+  params.append('username', username);
+  params.append('password', password);
+  
+  const response = await client.post('/auth/login', params);
   return response.data;
 };
 
@@ -77,23 +78,9 @@ export const createTarget = async (targetData) => {
 };
 
 export const checkSystemStatus = async () => {
-    // This endpoint is at the root, so we need to bypass the baseURL
-    // We can use the axios instance but override the baseURL for this request
-    // Or just use a relative path if we want to hit /api/v1/.. but the health check is usually at /
-    
-    // If the health check is at the root of the domain (not under /api/v1), we need to handle it carefully.
-    // In dev: /api/v1 is proxied. / is not proxied to the API server usually, it serves the frontend.
-    // However, we can add a specific proxy for /health or just assume the API is up if /api/v1 works.
-    
-    // Let's assume there is a health check at /api/v1/ or we just check /api/v1/inference/
-    // If the user specifically wants to check the root of the API server:
-    
     if (import.meta.env.DEV) {
-        // In dev, we can't easily hit the root of the target via the same proxy unless we add another proxy rule.
-        // For simplicity, let's just check the jobs endpoint as a "health check"
         return getJobs();
     } else {
-        // In prod, we can hit the full URL
         return axios.get('https://c2.vornac.store/');
     }
 };
