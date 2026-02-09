@@ -69,26 +69,6 @@ export const deleteJob = async (jobId) => {
   return response.data;
 };
 
-export const getTargets = async () => {
-  const response = await client.get('/targets/');
-  return response.data;
-};
-
-export const getTarget = async (targetId) => {
-  const response = await client.get(`/targets/${targetId}`);
-  return response.data;
-};
-
-export const getTargetPentests = async (targetId) => {
-  const response = await client.get(`/targets/${targetId}/pentests`);
-  return response.data;
-};
-
-export const createTarget = async (targetData) => {
-  const response = await client.post('/targets/', targetData);
-  return response.data;
-};
-
 export const checkSystemStatus = async () => {
     // Just check the jobs endpoint as a health check
     return getJobs();

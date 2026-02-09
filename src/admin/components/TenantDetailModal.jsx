@@ -1197,7 +1197,7 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
                       onChange={(e) => setKmsData({ ...kmsData, kek_id: e.target.value })}
                       placeholder={
                         kmsData.provider === 'aws' ? 'arn:aws:kms:us-east-1:...' :
-                        kmsData.provider === 'azure' ? 'https://vault.azure.net/keys/...' :
+                        kmsData.provider === 'azure' ? 'https://vault-name.vault.azure.net/keys/...' :
                         kmsData.provider === 'gcp' ? 'projects/.../cryptoKeys/...' :
                         'my-encryption-key'
                       }

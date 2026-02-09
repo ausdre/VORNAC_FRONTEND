@@ -89,12 +89,12 @@ export default function SSOConfigPage() {
 
   const getMetadataUrl = (tenantId) => {
     // This needs to be the full URL for the user to click/copy
-    const baseUrl = (import.meta.env.DEV) ? 'http://localhost:8000/api/v1' : 'https://c2.vornac.store/api/v1';
+    const baseUrl = '/api/v1';
     return `${baseUrl}/sso/auth/metadata/${tenantId}`;
   };
 
   const getAcsUrl = () => {
-    const baseUrl = (import.meta.env.DEV) ? 'http://localhost:8000/api/v1' : 'https://c2.vornac.store/api/v1';
+    const baseUrl = '/api/v1';
     return `${baseUrl}/sso/auth/acs`;
   };
 
