@@ -615,7 +615,7 @@ const Results = () => {
                       </svg>
                     </button>
 
-                    {isCompleted && report?.summary && (
+                    {isCompleted && report?.summary?.risk_score != null && (
                       <>
                         <div className="text-right flex flex-col justify-center hidden sm:block">
                           <p className="text-white/40 text-xs uppercase tracking-wider mb-1">Risk Score</p>
@@ -650,78 +650,101 @@ const Results = () => {
                 {/* Expanded Details */}
                 {isExpanded && isCompleted && report && (
                   <div className="p-8 border-t border-white/10 bg-[#05060a]">
-                    {/* Summary Section */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
-                      <div className="col-span-2">
-                        <h4 className="text-[#FFA317] text-xs font-bold uppercase tracking-widest mb-4">Management Summary</h4>
-                        <p className="text-white/70 text-sm leading-relaxed whitespace-pre-line">
-                          {report.summary.management}
-                        </p>
-                      </div>
-                      <div className="bg-white/5 rounded-lg p-6 border border-white/5">
-                        <h4 className="text-white/60 text-xs uppercase tracking-widest mb-4">Severity Breakdown</h4>
-                        <div className="space-y-3">
-                          {Object.entries(report.summary.severity_breakdown).map(([level, count]) => (
-                            count > 0 && (
-                              <div key={level} className="flex justify-between items-center">
-                                <span className="text-white/80 capitalize text-sm">{level}</span>
-                                <span className={`px-2 py-0.5 rounded text-xs font-bold border ${getSeverityColor(level)}`}>
-                                  {count}
-                                </span>
-                              </div>
-                            )
-                          ))}
+                    {/* Check if report has expected structure */}
+                    {!report.summary || !Array.isArray(report.findings) ? (
+                      <div className="text-center py-8">
+                        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-yellow-500/10 flex items-center justify-center">
+                          <svg className="w-8 h-8 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                          </svg>
                         </div>
+                        <h4 className="text-white font-bold text-lg mb-2">Incompatible Report Format</h4>
+                        <p className="text-white/50 text-sm mb-4">This pentest result uses an older or unsupported data format and cannot be displayed.</p>
+                        <details className="text-left max-w-lg mx-auto">
+                          <summary className="text-white/30 text-xs cursor-pointer hover:text-white/50 transition-colors">Show raw data</summary>
+                          <pre className="mt-3 bg-white/5 border border-white/10 rounded-lg p-4 text-white/60 text-xs overflow-auto max-h-64 font-mono">
+                            {JSON.stringify(report, null, 2)}
+                          </pre>
+                        </details>
                       </div>
-                    </div>
-
-                    {/* Findings List */}
-                    <div>
-                      <h4 className="text-[#FFA317] text-xs font-bold uppercase tracking-widest mb-6">Detailed Findings</h4>
-                      <div className="space-y-4">
-                        {report.findings.map((finding) => (
-                          <div key={finding.id} className="bg-[#0f111a] border border-white/5 rounded-lg p-6 hover:border-white/10 transition-colors">
-                            <div className="flex justify-between items-start mb-3">
-                              <div className="flex items-center gap-4">
-                                <span className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wide border ${getSeverityColor(finding.severity)}`}>
-                                  {finding.severity}
-                                </span>
-                                <h5 className="text-white font-medium text-lg">{finding.title}</h5>
-                              </div>
-                              <span className="text-white/30 text-xs font-mono">{finding.id}</span>
-                            </div>
-                            <p className="text-white/60 text-sm mb-4 leading-relaxed">{finding.description}</p>
-
-                            {/* Impact Section */}
-                            {finding.impact && (
-                              <div className="mb-4 bg-white/5 p-3 rounded border border-white/5">
-                                <h6 className="text-[#FFA317] text-xs font-bold uppercase mb-1 tracking-wider">Business Impact</h6>
-                                <p className="text-white/70 text-sm">{finding.impact}</p>
-                              </div>
-                            )}
-
-                            {/* Recommendation Section */}
-                            {finding.recommendation && finding.recommendation.length > 0 && (
-                              <div className="mb-4">
-                                <h6 className="text-green-400 text-xs font-bold uppercase mb-2 tracking-wider">Recommendation</h6>
-                                <ul className="list-disc list-inside text-white/60 text-sm space-y-1">
-                                  {finding.recommendation.map((rec, idx) => (
-                                    <li key={idx}>{rec}</li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-
-                            <div className="flex gap-6 text-xs text-white/40 font-mono border-t border-white/5 pt-3">
-                              <span>CVSS: <span className="text-white/70">{finding.cvss_score}</span></span>
-                              {finding.affected_assets && (
-                                <span>Assets: <span className="text-white/70">{finding.affected_assets.length}</span></span>
+                    ) : (
+                      <>
+                        {/* Summary Section */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
+                          <div className="col-span-2">
+                            <h4 className="text-[#FFA317] text-xs font-bold uppercase tracking-widest mb-4">Management Summary</h4>
+                            <p className="text-white/70 text-sm leading-relaxed whitespace-pre-line">
+                              {report.summary.management || 'No summary available.'}
+                            </p>
+                          </div>
+                          <div className="bg-white/5 rounded-lg p-6 border border-white/5">
+                            <h4 className="text-white/60 text-xs uppercase tracking-widest mb-4">Severity Breakdown</h4>
+                            <div className="space-y-3">
+                              {report.summary.severity_breakdown ? Object.entries(report.summary.severity_breakdown).map(([level, count]) => (
+                                count > 0 && (
+                                  <div key={level} className="flex justify-between items-center">
+                                    <span className="text-white/80 capitalize text-sm">{level}</span>
+                                    <span className={`px-2 py-0.5 rounded text-xs font-bold border ${getSeverityColor(level)}`}>
+                                      {count}
+                                    </span>
+                                  </div>
+                                )
+                              )) : (
+                                <p className="text-white/30 text-xs">No breakdown available</p>
                               )}
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    </div>
+                        </div>
+
+                        {/* Findings List */}
+                        <div>
+                          <h4 className="text-[#FFA317] text-xs font-bold uppercase tracking-widest mb-6">Detailed Findings</h4>
+                          <div className="space-y-4">
+                            {report.findings.map((finding, index) => (
+                              <div key={finding.id || index} className="bg-[#0f111a] border border-white/5 rounded-lg p-6 hover:border-white/10 transition-colors">
+                                <div className="flex justify-between items-start mb-3">
+                                  <div className="flex items-center gap-4">
+                                    <span className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wide border ${getSeverityColor(finding.severity)}`}>
+                                      {finding.severity || 'UNKNOWN'}
+                                    </span>
+                                    <h5 className="text-white font-medium text-lg">{finding.title || 'Untitled Finding'}</h5>
+                                  </div>
+                                  {finding.id && <span className="text-white/30 text-xs font-mono">{finding.id}</span>}
+                                </div>
+                                <p className="text-white/60 text-sm mb-4 leading-relaxed">{finding.description || 'No description available.'}</p>
+
+                                {/* Impact Section */}
+                                {finding.impact && (
+                                  <div className="mb-4 bg-white/5 p-3 rounded border border-white/5">
+                                    <h6 className="text-[#FFA317] text-xs font-bold uppercase mb-1 tracking-wider">Business Impact</h6>
+                                    <p className="text-white/70 text-sm">{finding.impact}</p>
+                                  </div>
+                                )}
+
+                                {/* Recommendation Section */}
+                                {Array.isArray(finding.recommendation) && finding.recommendation.length > 0 && (
+                                  <div className="mb-4">
+                                    <h6 className="text-green-400 text-xs font-bold uppercase mb-2 tracking-wider">Recommendation</h6>
+                                    <ul className="list-disc list-inside text-white/60 text-sm space-y-1">
+                                      {finding.recommendation.map((rec, idx) => (
+                                        <li key={idx}>{rec}</li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+
+                                <div className="flex gap-6 text-xs text-white/40 font-mono border-t border-white/5 pt-3">
+                                  {finding.cvss_score != null && <span>CVSS: <span className="text-white/70">{finding.cvss_score}</span></span>}
+                                  {finding.affected_assets && (
+                                    <span>Assets: <span className="text-white/70">{finding.affected_assets.length}</span></span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
