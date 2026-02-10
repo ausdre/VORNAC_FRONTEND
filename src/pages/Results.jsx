@@ -615,14 +615,8 @@ const Results = () => {
                       </svg>
                     </button>
 
-                    {isCompleted && report?.summary?.risk_score != null && (
-                      <>
-                        <div className="text-right flex flex-col justify-center hidden sm:block">
-                          <p className="text-white/40 text-xs uppercase tracking-wider mb-1">Risk Score</p>
-                          <p className="text-white font-bold text-xl">{report.summary.risk_score}</p>
-                        </div>
-                        <div className={`w-4 h-4 rounded-full ${getTrafficLightColor(report.summary.traffic_light)}`}></div>
-                      </>
+                    {isCompleted && report?.summary?.traffic_light && (
+                      <div className={`w-4 h-4 rounded-full ${getTrafficLightColor(report.summary.traffic_light)}`}></div>
                     )}
 
                     {isCompleted && (
