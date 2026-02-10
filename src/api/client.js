@@ -69,6 +69,13 @@ export const deleteJob = async (jobId) => {
   return response.data;
 };
 
+export const downloadPentestReport = async (jobId) => {
+  const response = await client.get(`/inference/${jobId}/pdf`, {
+    responseType: 'blob', // Important: tell axios to expect binary data
+  });
+  return response.data; // This will be a Blob
+};
+
 export const checkSystemStatus = async () => {
     // Just check the jobs endpoint as a health check
     return getJobs();

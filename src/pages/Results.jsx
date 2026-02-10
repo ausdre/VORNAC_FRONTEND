@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getJobs, deleteJob } from '../api/client';
+import { getJobs, deleteJob, downloadPentestReport } from '../api/client';
 
 const Results = () => {
   const [jobs, setJobs] = useState([]);
@@ -193,12 +193,33 @@ const Results = () => {
     }
   };
 
-  const handleDownloadReport = (job) => {
-    // This function receives the complete pentest JSON data
-    // The PDF generator will be implemented here
-    console.log('Download Report - Full Pentest Data:', job);
+  const handleDownloadReport = async (job) => {
+    try {
+      // Call API to generate and download PDF
+      const blob = await downloadPentestReport(job.id);
 
-    // For now, log the complete JSON to console
+      // Create a download link and trigger download
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+
+      // Generate filename
+      const targetName = job.result_data?.metadata?.client_name || job.input_data?.client || 'pentest';
+      const safeName = targetName.replace(/[^a-zA-Z0-9\s\-_]/g, '_');
+      link.download = `VORNAC_Report_${safeName}_${job.id.substring(0, 8)}.pdf`;
+
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Clean up the URL object
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to download report:', error);
+      setErrorModal({
+        message: `Failed to download report: ${error.response?.data?.detail || error.message}`
+      });
+    }
     // You can implement the PDF generator here
     alert('PDF generation will be implemented. Check console for complete JSON data.');
   };
