@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { getJobs } from '../api/client';
+import { getJobs, deleteJob } from '../api/client';
+import { getQueueItems, updateQueueItem, deleteQueueItem } from '../api/queue';
 
 const Queue = () => {
   const [activePentest, setActivePentest] = useState(null);
   const [scheduledQueue, setScheduledQueue] = useState([]);
   const [editModal, setEditModal] = useState(null); // { scheduled, date, time }
+  const [abortConfirm, setAbortConfirm] = useState(null); // { id, target }
 
   useEffect(() => {
     fetchQueue();
@@ -19,8 +21,8 @@ const Queue = () => {
       const active = jobs.find(j => j.status === 'PENDING' || j.status === 'PROCESSING');
       setActivePentest(active || null);
 
-      // Fetch scheduled pentests from localStorage
-      const queue = JSON.parse(localStorage.getItem('pentest_queue') || '[]');
+      // Fetch scheduled pentests from API
+      const queue = await getQueueItems();
       const pending = queue
         .filter(s => s.status === 'pending')
         .sort((a, b) => {
@@ -30,7 +32,7 @@ const Queue = () => {
           if (aPriority !== bPriority) {
             return aPriority - bPriority;
           }
-          return new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime();
+          return new Date(a.scheduled_for).getTime() - new Date(b.scheduled_for).getTime();
         })
         .slice(0, 50); // Limit to next 50 tests
 
@@ -40,16 +42,39 @@ const Queue = () => {
     }
   };
 
-  const handleDeleteScheduled = (scheduledId) => {
-    const queue = JSON.parse(localStorage.getItem('pentest_queue') || '[]');
-    const updated = queue.filter(s => s.id !== scheduledId);
-    localStorage.setItem('pentest_queue', JSON.stringify(updated));
-    fetchQueue();
+  const handleDeleteScheduled = async (scheduledId) => {
+    try {
+      await deleteQueueItem(scheduledId);
+      fetchQueue();
+    } catch (error) {
+      console.error('Failed to delete scheduled pentest:', error);
+      alert('Failed to delete scheduled pentest. Please try again.');
+    }
   };
 
-  const formatTimeRemaining = (scheduledFor) => {
+  const handleAbortPentest = (pentest) => {
+    const targetName = pentest.input_data?.client || pentest.input_data?.target || 'Unknown';
+    setAbortConfirm({ id: pentest.id, target: targetName });
+  };
+
+  const confirmAbortPentest = async () => {
+    try {
+      await deleteJob(abortConfirm.id);
+      setAbortConfirm(null);
+      fetchQueue();
+    } catch (error) {
+      console.error('Failed to abort pentest:', error);
+      alert('Failed to abort pentest. Please try again.');
+    }
+  };
+
+  const cancelAbortPentest = () => {
+    setAbortConfirm(null);
+  };
+
+  const formatTimeRemaining = (scheduled_for) => {
     const now = new Date();
-    const scheduled = new Date(scheduledFor);
+    const scheduled = new Date(scheduled_for);
     const diff = scheduled - now;
 
     if (diff < 0) return 'Starting soon...';
@@ -64,7 +89,7 @@ const Queue = () => {
   };
 
   const handleEditSchedule = (scheduled) => {
-    const scheduledDate = new Date(scheduled.scheduledFor);
+    const scheduledDate = new Date(scheduled.scheduled_for);
     const dateStr = scheduledDate.toISOString().split('T')[0];
     const timeStr = scheduledDate.toTimeString().slice(0, 5);
 
@@ -75,7 +100,7 @@ const Queue = () => {
     });
   };
 
-  const handleSaveSchedule = () => {
+  const handleSaveSchedule = async () => {
     if (!editModal.date || !editModal.time) {
       return;
     }
@@ -88,21 +113,18 @@ const Queue = () => {
       return;
     }
 
-    // Update the scheduled pentest in localStorage
-    const queue = JSON.parse(localStorage.getItem('pentest_queue') || '[]');
-    const updated = queue.map(item => {
-      if (item.id === editModal.scheduled.id) {
-        return {
-          ...item,
-          scheduledFor: newScheduledFor.toISOString()
-        };
-      }
-      return item;
-    });
-    localStorage.setItem('pentest_queue', JSON.stringify(updated));
+    try {
+      // Update the scheduled pentest via API
+      await updateQueueItem(editModal.scheduled.id, {
+        scheduled_for: newScheduledFor.toISOString()
+      });
 
-    setEditModal(null);
-    fetchQueue();
+      setEditModal(null);
+      fetchQueue();
+    } catch (error) {
+      console.error('Failed to update schedule:', error);
+      alert('Failed to update schedule. Please try again.');
+    }
   };
 
   const handleCancelEdit = () => {
@@ -111,6 +133,38 @@ const Queue = () => {
 
   return (
     <div className="min-h-screen bg-[#02030a] p-8 pt-12">
+      {/* Abort Pentest Modal */}
+      {abortConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={cancelAbortPentest}>
+          <div className="bg-[#0a0b14] border border-white/20 rounded-xl p-8 max-w-md mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/10 flex items-center justify-center">
+                <span className="text-3xl">⚠️</span>
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-2">Abort Pentest?</h2>
+              <p className="text-white/60">
+                Are you sure you want to abort the active pentest for <span className="text-white font-semibold">"{abortConfirm.target}"</span>?
+              </p>
+              <p className="text-white/40 text-sm mt-2">This action cannot be undone. All progress will be lost.</p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={cancelAbortPentest}
+                className="flex-1 bg-white/5 hover:bg-white/10 text-white font-medium py-3 px-4 rounded-lg border border-white/10 hover:border-white/20 transition-all duration-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmAbortPentest}
+                className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-4 rounded-lg shadow-[0_0_20px_rgba(239,68,68,0.3)] hover:shadow-[0_0_30px_rgba(239,68,68,0.5)] transition-all duration-200"
+              >
+                Abort
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Edit Schedule Modal */}
       {editModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={handleCancelEdit}>
@@ -123,7 +177,7 @@ const Queue = () => {
               </div>
               <h2 className="text-2xl font-bold text-white mb-2 text-center">Edit Schedule</h2>
               <p className="text-white/60 text-center">
-                Target: <span className="text-white font-semibold">"{editModal.scheduled.target?.name || 'Unknown'}"</span>
+                Target: <span className="text-white font-semibold">"{editModal.scheduled.target_data?.name || 'Unknown'}"</span>
               </p>
             </div>
 
@@ -202,7 +256,7 @@ const Queue = () => {
                   <span className="w-1 h-4 bg-blue-500 rounded-full animate-[bounce_1s_ease-in-out_infinite_0.4s]" style={{ animationDelay: '0.4s' }}></span>
                 </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 relative z-10">
                 <div>
                   <p className="text-white/40 text-xs uppercase tracking-wider mb-1">Target</p>
                   <p className="text-white font-semibold">{activePentest.input_data?.client || 'Unknown'}</p>
@@ -216,6 +270,10 @@ const Queue = () => {
                   </div>
                 </div>
                 <div>
+                  <p className="text-white/40 text-xs uppercase tracking-wider mb-1">Current State</p>
+                  <p className="text-cyan-400 font-medium text-sm">{activePentest.current_state || 'Processing'}</p>
+                </div>
+                <div>
                   <p className="text-white/40 text-xs uppercase tracking-wider mb-1">Started</p>
                   <p className="text-white/70">{new Date(activePentest.created_at).toLocaleString()}</p>
                 </div>
@@ -226,6 +284,20 @@ const Queue = () => {
                 <div className="h-1 bg-white/5 rounded-full overflow-hidden">
                   <div className="h-full bg-gradient-to-r from-blue-500 via-cyan-400 to-blue-500 rounded-full animate-[progress_2s_ease-in-out_infinite] shadow-[0_0_10px_#3b82f6]"></div>
                 </div>
+              </div>
+
+              {/* Abort Button */}
+              <div className="mt-6 relative z-10 flex justify-end">
+                <button
+                  onClick={() => handleAbortPentest(activePentest)}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 hover:text-red-300 font-bold rounded-lg border border-red-500/30 hover:border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)] hover:shadow-[0_0_25px_rgba(239,68,68,0.4)] transition-all duration-200 text-sm"
+                  title="Abort active pentest"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  <span>Abort Pentest</span>
+                </button>
               </div>
             </div>
           ) : (
@@ -296,25 +368,25 @@ const Queue = () => {
                       {/* Target Info */}
                       <div className="md:col-span-2">
                         <p className="text-white/40 text-xs uppercase tracking-wider mb-1">Target</p>
-                        <p className="text-white font-semibold text-lg">{scheduled.target?.name || 'Unknown'}</p>
-                        <p className="text-white/50 text-sm font-mono mt-1">{scheduled.target?.url || 'Unknown'}</p>
+                        <p className="text-white font-semibold text-lg">{scheduled.target_data?.name || 'Unknown'}</p>
+                        <p className="text-white/50 text-sm font-mono mt-1">{scheduled.target_data?.url || 'Unknown'}</p>
                       </div>
 
                       {/* Scheduled Date/Time */}
                       <div>
                         <p className="text-white/40 text-xs uppercase tracking-wider mb-1">Scheduled For</p>
                         <p className="text-[#FFA317] font-bold text-lg">
-                          {new Date(scheduled.scheduledFor).toLocaleDateString()}
+                          {new Date(scheduled.scheduled_for).toLocaleDateString()}
                         </p>
                         <p className="text-[#FFA317] text-sm">
-                          {new Date(scheduled.scheduledFor).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {new Date(scheduled.scheduled_for).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </p>
                       </div>
 
                       {/* Time Remaining */}
                       <div>
                         <p className="text-white/40 text-xs uppercase tracking-wider mb-1">Starting In</p>
-                        <p className="text-white font-semibold text-lg">{formatTimeRemaining(scheduled.scheduledFor)}</p>
+                        <p className="text-white font-semibold text-lg">{formatTimeRemaining(scheduled.scheduled_for)}</p>
                         {scheduled.priority === 0 && (
                           <span className="inline-block mt-1 px-2 py-0.5 bg-[#FFA317]/20 border border-[#FFA317]/40 text-[#FFA317] text-xs font-bold rounded">
                             IMMEDIATE

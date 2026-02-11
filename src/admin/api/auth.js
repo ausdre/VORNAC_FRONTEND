@@ -50,3 +50,19 @@ export const loginStep2 = async (sessionToken, totpCode) => {
   });
   return response.data;
 };
+
+/**
+ * Change Password
+ * Superadmin can change their own password
+ */
+export const changePassword = async (currentPassword, newPassword, token) => {
+  const response = await axios.post('/api/v1/auth/change-password', {
+    current_password: currentPassword,
+    new_password: newPassword
+  }, {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+  return response.data;
+};

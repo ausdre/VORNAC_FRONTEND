@@ -9,7 +9,6 @@ const Results = () => {
   const [error, setError] = useState(null);
   const [expandedPentest, setExpandedPentest] = useState(null);
   const [deletePentestConfirm, setDeletePentestConfirm] = useState(null); // { id, name }
-  const [deleteAllConfirm, setDeleteAllConfirm] = useState(null); // { targetUrl, targetName }
   const [finalizeConfirm, setFinalizeConfirm] = useState(null); // { id, name }
   const [searchQuery, setSearchQuery] = useState('');
   const [errorModal, setErrorModal] = useState(null); // { message }
@@ -147,33 +146,6 @@ const Results = () => {
     setDeletePentestConfirm(null);
   };
 
-  const handleDeleteAllPentests = (target) => {
-    setDeleteAllConfirm({ targetUrl: target.url, targetName: target.name, pentestCount: target.pentests.length });
-  };
-
-  const confirmDeleteAllPentests = async () => {
-    try {
-      const target = targets.find(t => t.url === deleteAllConfirm.targetUrl);
-      if (!target) return;
-
-      // Delete all pentests for this target
-      for (const pentest of target.pentests) {
-        await deleteJob(pentest.id);
-      }
-
-      setDeleteAllConfirm(null);
-      // Refresh the jobs list
-      await fetchJobs();
-    } catch (error) {
-      console.error('Failed to delete all pentests:', error);
-      setDeleteAllConfirm(null);
-      setErrorModal({ message: 'Failed to delete all pentests. Please try again.' });
-    }
-  };
-
-  const cancelDeleteAllPentests = () => {
-    setDeleteAllConfirm(null);
-  };
 
   const getSeverityColor = (severity) => {
     switch (severity?.toUpperCase()) {
@@ -311,37 +283,6 @@ const Results = () => {
           </div>
         )}
 
-        {/* Delete All Pentests Modal */}
-        {deleteAllConfirm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={cancelDeleteAllPentests}>
-            <div className="bg-[#0a0b14] border border-white/20 rounded-xl p-8 max-w-md mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/10 flex items-center justify-center">
-                  <span className="text-3xl">⚠️</span>
-                </div>
-                <h2 className="text-2xl font-bold text-white mb-2">Delete All Pentests?</h2>
-                <p className="text-white/60">
-                  Are you sure you want to delete <span className="text-white font-semibold">all {deleteAllConfirm.pentestCount} pentest(s)</span> from <span className="text-white font-semibold">"{deleteAllConfirm.targetName}"</span>?
-                </p>
-                <p className="text-white/40 text-sm mt-2">This action cannot be undone. The target will remain but all pentest results will be deleted.</p>
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={cancelDeleteAllPentests}
-                  className="flex-1 bg-white/5 hover:bg-white/10 text-white font-medium py-3 px-4 rounded-lg border border-white/10 hover:border-white/20 transition-all duration-200"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmDeleteAllPentests}
-                  className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-4 rounded-lg shadow-[0_0_20px_rgba(239,68,68,0.3)] hover:shadow-[0_0_30px_rgba(239,68,68,0.5)] transition-all duration-200"
-                >
-                  Delete All
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Error Modal */}
         {errorModal && (
@@ -554,38 +495,6 @@ const Results = () => {
         </div>
       )}
 
-      {/* Delete All Pentests Modal */}
-      {deleteAllConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={cancelDeleteAllPentests}>
-          <div className="bg-[#0a0b14] border border-white/20 rounded-xl p-8 max-w-md mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="text-center mb-6">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/10 flex items-center justify-center">
-                <span className="text-3xl">⚠️</span>
-              </div>
-              <h2 className="text-2xl font-bold text-white mb-2">Delete All Pentests?</h2>
-              <p className="text-white/60">
-                Are you sure you want to delete <span className="text-white font-semibold">all {deleteAllConfirm.pentestCount} pentest(s)</span> from <span className="text-white font-semibold">"{deleteAllConfirm.targetName}"</span>?
-              </p>
-              <p className="text-white/40 text-sm mt-2">This action cannot be undone. The target will remain but all pentest results will be deleted.</p>
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={cancelDeleteAllPentests}
-                className="flex-1 bg-white/5 hover:bg-white/10 text-white font-medium py-3 px-4 rounded-lg border border-white/10 hover:border-white/20 transition-all duration-200"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmDeleteAllPentests}
-                className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-4 rounded-lg shadow-[0_0_20px_rgba(239,68,68,0.3)] hover:shadow-[0_0_30px_rgba(239,68,68,0.5)] transition-all duration-200"
-              >
-                Delete All
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Error Modal */}
       {errorModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setErrorModal(null)}>
@@ -664,33 +573,6 @@ const Results = () => {
                 <p className="text-white/40 text-sm mt-4">{selectedTarget.description}</p>
               )}
             </div>
-            <div className="flex items-center gap-3">
-              {pentests.length > 0 && (() => {
-                // Get the most recent completed pentest
-                const latestPentest = pentests.find(p => p.status === 'COMPLETED');
-
-                return latestPentest && (
-                  <button
-                    onClick={() => handleFinalizePentest(latestPentest)}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 hover:text-green-300 font-bold rounded-lg border border-green-500/30 hover:border-green-500/50 shadow-[0_0_15px_rgba(34,197,94,0.2)] hover:shadow-[0_0_25px_rgba(34,197,94,0.4)] transition-all duration-200 text-sm whitespace-nowrap"
-                    title="Finalize Latest Pentest"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>Finalize Latest</span>
-                  </button>
-                );
-              })()}
-              {pentests.length > 0 && (
-                <button
-                  onClick={() => handleDeleteAllPentests(selectedTarget)}
-                  className="bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 font-medium py-2 px-4 rounded-lg border border-red-500/20 hover:border-red-500/40 transition-all duration-200 text-sm whitespace-nowrap"
-                >
-                  Delete All Pentests
-                </button>
-              )}
-            </div>
           </div>
           <div className="flex items-center gap-4 pt-4 border-t border-white/5">
             <div className="text-white/30 text-sm">
@@ -753,10 +635,31 @@ const Results = () => {
                   {/* Group Header - only show if multiple pentests share the same report_id AND one is finalized */}
                   {isGroup && hasFinalReport && (
                     <div className="mb-4 pb-3 border-b border-white/10">
-                      <div className="flex items-center gap-3">
-                        <div className="w-1 h-6 bg-[#FFA317] rounded-full"></div>
-                        <h3 className="text-white font-bold text-base">{reportId}</h3>
-                        <span className="text-white/40 text-xs">({jobs.length} version{jobs.length > 1 ? 's' : ''})</span>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-1 h-6 bg-[#FFA317] rounded-full"></div>
+                          <h3 className="text-white font-bold text-base">{reportId}</h3>
+                          <span className="text-white/40 text-xs">({jobs.length} version{jobs.length > 1 ? 's' : ''})</span>
+                        </div>
+                        {(() => {
+                          // Get the latest non-finalized pentest in this group
+                          const latestDraft = jobs
+                            .filter(j => j.status === 'COMPLETED' && !j.result_data?.metadata?.is_final)
+                            .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+
+                          return latestDraft && (
+                            <button
+                              onClick={() => handleFinalizePentest(latestDraft)}
+                              className="flex items-center gap-2 px-3 py-1.5 bg-green-500/20 hover:bg-green-500/30 text-green-400 hover:text-green-300 font-bold rounded-lg border border-green-500/30 hover:border-green-500/50 shadow-[0_0_15px_rgba(34,197,94,0.2)] hover:shadow-[0_0_25px_rgba(34,197,94,0.4)] transition-all duration-200 text-xs whitespace-nowrap"
+                              title="Finalize Latest Draft"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              <span>Finalize</span>
+                            </button>
+                          );
+                        })()}
                       </div>
                     </div>
                   )}

@@ -15,6 +15,7 @@ import UsersPage from './pages/UsersPage';
 import AuditLogsPage from './pages/AuditLogsPage';
 import SSOConfigPage from './pages/SSOConfigPage';
 import KMSConfigPage from './pages/KMSConfigPage';
+import AdminSettingsPage from './pages/AdminSettingsPage';
 
 // Components
 import AdminLayout from './components/AdminLayout';
@@ -81,6 +82,14 @@ const AdminApp = () => {
           element={
             <AdminProtectedRoute>
               <KMSConfigPage />
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/settings"
+          element={
+            <AdminProtectedRoute>
+              <AdminSettingsPage />
             </AdminProtectedRoute>
           }
         />
