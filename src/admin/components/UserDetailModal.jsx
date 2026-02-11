@@ -4,6 +4,7 @@
  */
 import { useState, useEffect } from 'react';
 import { updateUser, resetUserPassword, resetUserMFA } from '../api/users';
+import { useToastStore } from '../../stores/toastStore';
 
 export default function UserDetailModal({ user, tenants, onClose, onUpdate }) {
   const [activeTab, setActiveTab] = useState('overview');
@@ -59,8 +60,10 @@ export default function UserDetailModal({ user, tenants, onClose, onUpdate }) {
       await updateUser(user.id, payload);
       onUpdate();
       onClose();
+      useToastStore.getState().success('User updated successfully');
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to update user');
+      useToastStore.getState().error('Failed to update user');
     } finally {
       setLoading(false);
     }

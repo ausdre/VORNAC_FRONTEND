@@ -14,6 +14,7 @@ import {
 } from '../api/tenants';
 import adminClient from '../api/client';
 import TenantDetailModal from '../components/TenantDetailModal';
+import { useToastStore } from '../../stores/toastStore';
 
 const TenantsPage = () => {
   const [tenants, setTenants] = useState([]);
@@ -187,8 +188,10 @@ const TenantsPage = () => {
       resetFormData();
       fetchTenants();
       fetchConfigurations();
+      useToastStore.getState().success('Tenant created successfully');
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to create tenant');
+      useToastStore.getState().error('Failed to create tenant');
     }
   };
 
@@ -230,8 +233,10 @@ const TenantsPage = () => {
       setSelectedTenant(null);
       setFormData({ name: '', pentest_limit_per_year: '', contract_end_date: '', annual_arr: '' });
       fetchTenants();
+      useToastStore.getState().success('Tenant updated successfully');
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to update tenant');
+      useToastStore.getState().error('Failed to update tenant');
     }
   };
 
@@ -258,9 +263,9 @@ const TenantsPage = () => {
       setSuspendReason('');
       setSelectedTenantForSuspend(null);
       fetchTenants();
-      alert(`Tenant "${selectedTenantForSuspend.name}" has been suspended`);
+      useToastStore.getState().success(`Tenant "${selectedTenantForSuspend.name}" has been suspended`);
     } catch (err) {
-      alert('Failed to suspend tenant');
+      useToastStore.getState().error('Failed to suspend tenant');
     }
   };
 
@@ -271,9 +276,9 @@ const TenantsPage = () => {
     try {
       await unsuspendTenant(tenant.id);
       fetchTenants();
-      alert(`Tenant "${tenant.name}" has been reactivated`);
+      useToastStore.getState().success(`Tenant "${tenant.name}" has been reactivated`);
     } catch (err) {
-      alert('Failed to unsuspend tenant');
+      useToastStore.getState().error('Failed to unsuspend tenant');
     }
   };
 
@@ -290,9 +295,9 @@ const TenantsPage = () => {
     try {
       await regenerateTenantAPIKey(tenant.id);
       fetchTenants();
-      alert('API key regenerated successfully');
+      useToastStore.getState().success('API key regenerated successfully');
     } catch (err) {
-      alert('Failed to regenerate API key');
+      useToastStore.getState().error('Failed to regenerate API key');
     }
   };
 
@@ -485,6 +490,7 @@ const TenantsPage = () => {
                 >
                   Name <SortIcon column="name" />
                 </th>
+                <th className="text-left p-4 text-white/60 text-sm font-bold">Logo</th>
                 <th
                   onClick={() => handleSort('status')}
                   className="text-left p-4 text-white/60 text-sm font-bold cursor-pointer hover:text-white transition-colors"
@@ -528,6 +534,19 @@ const TenantsPage = () => {
                   className={`hover:bg-white/5 cursor-pointer transition-colors ${!tenant.is_active ? 'opacity-60' : ''}`}
                 >
                   <td className="p-4 font-medium text-white">{tenant.name}</td>
+                  <td className="p-4">
+                    {tenant.logo_url ? (
+                      <img
+                        src={`${import.meta.env.VITE_API_URL}${tenant.logo_url}`}
+                        alt={`${tenant.name} logo`}
+                        className="h-8 w-8 object-contain rounded border border-white/10 bg-white/5"
+                      />
+                    ) : (
+                      <div className="h-8 w-8 rounded border border-white/10 bg-white/5 flex items-center justify-center text-white/20 text-xs">
+                        📷
+                      </div>
+                    )}
+                  </td>
                   <td className="p-4">
                     {tenant.is_active ? (
                       <span className="px-2 py-1 bg-green-500/10 text-green-400 text-xs font-bold rounded">Active</span>

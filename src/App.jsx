@@ -11,6 +11,7 @@ import Queue from './pages/Queue';
 import Settings from './pages/Settings';
 import Navbar from './Navbar';
 import AdminApp from './admin/AdminApp';
+import Toast from './components/Toast';
 
 // Use relative path to leverage Vite proxy (dev) and Vercel rewrites (prod)
 const API_BASE = '/api/v1';
@@ -363,21 +364,24 @@ function AppContent() {
 
   // Regular app routes
   return (
-    <div className="min-h-screen bg-[#02030a] flex flex-col">
-      <Navbar onLogout={logout} />
-      {!isAuthenticated ? (
-        <Login />
-      ) : (
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/schedule" element={<NewPentest />} />
-          <Route path="/queue" element={<Queue />} />
-          <Route path="/results" element={<Results />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
-      )}
-    </div>
+    <>
+      <Toast />
+      <div className="min-h-screen bg-[#02030a] flex flex-col">
+        <Navbar onLogout={logout} />
+        {!isAuthenticated ? (
+          <Login />
+        ) : (
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/schedule" element={<NewPentest />} />
+            <Route path="/queue" element={<Queue />} />
+            <Route path="/results" element={<Results />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="*" element={<Navigate to="/" />} />
+          </Routes>
+        )}
+      </div>
+    </>
   );
 }
 

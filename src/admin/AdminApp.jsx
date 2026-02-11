@@ -6,6 +6,7 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAdminAuthStore } from './stores/adminAuthStore';
+import Toast from '../components/Toast';
 
 // Pages
 import AdminLogin from './pages/AdminLogin';
@@ -26,16 +27,21 @@ const AdminApp = () => {
 
   if (!isAuthenticated) {
     return (
-      <Routes>
-        <Route path="/admin/login" element={<AdminLogin />} />
-        <Route path="/admin/*" element={<Navigate to="/admin/login" replace />} />
-      </Routes>
+      <>
+        <Toast />
+        <Routes>
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route path="/admin/*" element={<Navigate to="/admin/login" replace />} />
+        </Routes>
+      </>
     );
   }
 
   return (
-    <AdminLayout>
-      <Routes>
+    <>
+      <Toast />
+      <AdminLayout>
+        <Routes>
         <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
         <Route
           path="/admin/dashboard"
@@ -96,6 +102,7 @@ const AdminApp = () => {
         <Route path="/admin/*" element={<Navigate to="/admin/dashboard" replace />} />
       </Routes>
     </AdminLayout>
+    </>
   );
 };
 

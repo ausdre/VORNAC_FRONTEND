@@ -11,6 +11,7 @@ import {
   deleteTenant
 } from '../api/tenants';
 import { listUsers, createUser, updateUser } from '../api/users';
+import { useToastStore } from '../../stores/toastStore';
 
 export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
   const [activeTab, setActiveTab] = useState('overview');
@@ -52,6 +53,9 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
     contract_end_date: tenant.contract_end_date ? tenant.contract_end_date.split('T')[0] : '',
     annual_arr: tenant.annual_arr || ''
   });
+
+  // Contract end date visibility toggle
+  const [hasContractEndDate, setHasContractEndDate] = useState(!!tenant.contract_end_date);
 
   // Logo upload state
   const [logoFile, setLogoFile] = useState(null);
@@ -278,8 +282,10 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
 
       await adminClient.put(`/tenants/${tenant.id}`, payload);
       onUpdate();
+      useToastStore.getState().success('Tenant updated successfully');
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to update tenant');
+      useToastStore.getState().error('Failed to update tenant');
     } finally {
       setLoading(false);
     }
@@ -330,9 +336,10 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
       setLogoPreview(response.data.logo_url);
       setLogoFile(null);
       onUpdate();
-      alert('Logo uploaded successfully!');
+      useToastStore.getState().success('Logo uploaded successfully');
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to upload logo');
+      useToastStore.getState().error('Failed to upload logo');
     } finally {
       setUploadingLogo(false);
     }
@@ -355,9 +362,10 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
         setSsoConfig(response.data);
       }
       loadConfigurations();
-      alert('SSO configuration saved successfully!');
+      useToastStore.getState().success('SSO configuration saved successfully');
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to configure SSO');
+      useToastStore.getState().error('Failed to configure SSO');
     } finally {
       setLoading(false);
     }
@@ -368,8 +376,9 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
     try {
       await adminClient.put(`/sso/configurations/${ssoConfig.id}/enable`);
       loadConfigurations();
+      useToastStore.getState().success('SSO enabled successfully');
     } catch (err) {
-      alert('Failed to enable SSO: ' + err.message);
+      useToastStore.getState().error('Failed to enable SSO: ' + err.message);
     }
   };
 
@@ -378,8 +387,9 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
     try {
       await adminClient.put(`/sso/configurations/${ssoConfig.id}/disable`);
       loadConfigurations();
+      useToastStore.getState().success('SSO disabled successfully');
     } catch (err) {
-      alert('Failed to disable SSO: ' + err.message);
+      useToastStore.getState().error('Failed to disable SSO: ' + err.message);
     }
   };
 
@@ -435,9 +445,10 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
         setKmsConfig(response.data);
       }
       loadConfigurations();
-      alert('KMS configuration saved successfully!');
+      useToastStore.getState().success('KMS configuration saved successfully');
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to configure KMS');
+      useToastStore.getState().error('Failed to configure KMS');
     } finally {
       setLoading(false);
     }
@@ -462,8 +473,9 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
     try {
       await adminClient.put(`/kms/configurations/${kmsConfig.id}/enable`);
       loadConfigurations();
+      useToastStore.getState().success('KMS enabled successfully');
     } catch (err) {
-      alert('Failed to enable KMS: ' + err.message);
+      useToastStore.getState().error('Failed to enable KMS: ' + err.message);
     }
   };
 
@@ -751,7 +763,7 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
 
               <div className="border-t border-white/10 pt-4">
                 <h4 className="text-white font-bold mb-4">Contract Details</h4>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-4">
                   <div>
                     <label className="block text-white/60 text-sm mb-2">Pentest Limit (per year)</label>
                     <input
@@ -763,15 +775,34 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
                     />
                     <p className="text-white/40 text-xs mt-1">Leave blank for unlimited</p>
                   </div>
+
                   <div>
-                    <label className="block text-white/60 text-sm mb-2">Contract End Date</label>
-                    <input
-                      type="date"
-                      value={tenantData.contract_end_date}
-                      onChange={(e) => setTenantData({ ...tenantData, contract_end_date: e.target.value })}
-                      className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white"
-                    />
-                    <p className="text-white/40 text-xs mt-1">Leave blank for unlimited</p>
+                    <label className="flex items-center text-white cursor-pointer mb-3">
+                      <input
+                        type="checkbox"
+                        checked={hasContractEndDate}
+                        onChange={(e) => {
+                          setHasContractEndDate(e.target.checked);
+                          if (!e.target.checked) {
+                            setTenantData({ ...tenantData, contract_end_date: '' });
+                          }
+                        }}
+                        className="mr-2 w-4 h-4"
+                      />
+                      <span>Set Contract End Date</span>
+                    </label>
+
+                    {hasContractEndDate && (
+                      <>
+                        <input
+                          type="date"
+                          value={tenantData.contract_end_date}
+                          onChange={(e) => setTenantData({ ...tenantData, contract_end_date: e.target.value })}
+                          className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white"
+                        />
+                        <p className="text-white/40 text-xs mt-1">Specify when the contract expires</p>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
