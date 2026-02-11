@@ -32,13 +32,18 @@ export const useAdminAuthStore = create(
       loginStep2: (accessToken) => {
         // Validate token
         if (isTokenExpired(accessToken)) {
-          console.error('Token is expired');
+          console.error('[Admin Auth] Token is expired');
           return false;
         }
 
         const user = extractUserFromToken(accessToken);
-        if (!user || user.role !== 'super_admin') {
-          console.error('Invalid token: not a super admin');
+        if (!user) {
+          console.error('[Admin Auth] Failed to extract user from token');
+          return false;
+        }
+
+        if (user.role !== 'super_admin') {
+          console.error('[Admin Auth] Invalid role:', user.role, '(expected: super_admin)');
           return false;
         }
 

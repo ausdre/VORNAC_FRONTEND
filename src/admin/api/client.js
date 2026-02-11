@@ -32,6 +32,7 @@ adminClient.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401 || error.response?.status === 403) {
       // Unauthorized or forbidden - logout
+      console.error('[Admin API] Auth error:', error.response?.status, 'URL:', error.config?.url);
       useAdminAuthStore.getState().logout();
       window.location.href = '/admin/login';
     }

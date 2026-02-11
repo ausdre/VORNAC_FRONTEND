@@ -122,7 +122,7 @@ export default function TargetDetailModal({ target, onClose, onUpdate, isNew = f
   const [authCredentials, setAuthCredentials] = useState(
     target?.auth_credentials?.length > 0
       ? target.auth_credentials
-      : [{ username: '', password: '', token: '', cookie: '' }]
+      : [{ username: '', password: '', token: '', cookie: '', role: 'user' }]
   );
 
   useEffect(() => {
@@ -160,7 +160,7 @@ export default function TargetDetailModal({ target, onClose, onUpdate, isNew = f
   };
 
   const addAuthCredential = () => {
-    setAuthCredentials(prev => [...prev, { username: '', password: '', token: '', cookie: '' }]);
+    setAuthCredentials(prev => [...prev, { username: '', password: '', token: '', cookie: '', role: 'user' }]);
   };
 
   const removeAuthCredential = (index) => {
@@ -485,14 +485,41 @@ export default function TargetDetailModal({ target, onClose, onUpdate, isNew = f
 
                   <div className="space-y-3">
                     {authCredentials.map((cred, i) => (
-                      <CredentialBlock
-                        key={i}
-                        credential={cred}
-                        index={i}
-                        onUpdate={(key, value) => updateAuthCredential(i, key, value)}
-                        onRemove={() => removeAuthCredential(i)}
-                        fields={getAuthFields()}
-                      />
+                      <div key={i} className="space-y-3">
+                        <CredentialBlock
+                          credential={cred}
+                          index={i}
+                          onUpdate={(key, value) => updateAuthCredential(i, key, value)}
+                          onRemove={() => removeAuthCredential(i)}
+                          fields={getAuthFields()}
+                        />
+                        {/* Role Selector for each credential */}
+                        <div className="pl-4">
+                          <label className={labelClass}>User Role</label>
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              onClick={() => updateAuthCredential(i, 'role', 'user')}
+                              className={`p-2.5 rounded-lg border text-center text-sm transition-all ${
+                                (cred.role || 'user') === 'user'
+                                  ? 'border-blue-500 bg-blue-500/10 text-blue-400 font-bold'
+                                  : 'border-white/10 bg-white/5 text-white/60 hover:border-white/20'
+                              }`}
+                            >
+                              User
+                            </button>
+                            <button
+                              onClick={() => updateAuthCredential(i, 'role', 'admin')}
+                              className={`p-2.5 rounded-lg border text-center text-sm transition-all ${
+                                cred.role === 'admin'
+                                  ? 'border-[#FFA317] bg-[#FFA317]/10 text-[#FFA317] font-bold'
+                                  : 'border-white/10 bg-white/5 text-white/60 hover:border-white/20'
+                              }`}
+                            >
+                              Admin
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     ))}
                     <button
                       onClick={addAuthCredential}

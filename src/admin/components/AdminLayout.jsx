@@ -143,6 +143,13 @@ const AdminLayout = ({ children }) => {
                       <div className="text-sm font-medium text-white">{user?.email}</div>
                       <div className="text-xs text-white/40 mt-1">Super Administrator</div>
                     </div>
+                    <Link
+                      to="/admin/settings"
+                      onClick={() => setShowUserMenu(false)}
+                      className="block px-4 py-3 text-sm text-white hover:bg-white/5 transition-colors"
+                    >
+                      Settings
+                    </Link>
                     <button
                       onClick={handleLogout}
                       className="w-full text-left px-4 py-3 text-sm text-red-400 hover:bg-white/5 transition-colors"

@@ -53,6 +53,11 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
     annual_arr: tenant.annual_arr || ''
   });
 
+  // Logo upload state
+  const [logoFile, setLogoFile] = useState(null);
+  const [logoPreview, setLogoPreview] = useState(tenant.logo_url || null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+
   // Authentication type
   const [authType, setAuthType] = useState('authenticator'); // 'authenticator' or 'sso'
 
@@ -277,6 +282,59 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
       setError(err.response?.data?.detail || 'Failed to update tenant');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleLogoFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validate file type
+      const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml'];
+      if (!validTypes.includes(file.type)) {
+        setError('Invalid file type. Please upload PNG, JPG, or SVG');
+        return;
+      }
+
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setError('File too large. Maximum size is 5MB');
+        return;
+      }
+
+      setLogoFile(file);
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoPreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleUploadLogo = async () => {
+    if (!logoFile) return;
+
+    setUploadingLogo(true);
+    setError('');
+
+    try {
+      const formData = new FormData();
+      formData.append('file', logoFile);
+
+      const response = await adminClient.post(`/tenants/${tenant.id}/logo`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      setLogoPreview(response.data.logo_url);
+      setLogoFile(null);
+      onUpdate();
+      alert('Logo uploaded successfully!');
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to upload logo');
+    } finally {
+      setUploadingLogo(false);
     }
   };
 
@@ -740,6 +798,55 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
                         : 'N/A'}
                     </div>
                     <p className="text-white/40 text-xs mt-1">Calculated from ARR / pentests</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Logo Upload Section */}
+              <div className="border-t border-white/10 pt-4">
+                <h4 className="text-white font-bold mb-4">Tenant Logo (PDF Reports)</h4>
+                <div className="space-y-4">
+                  {/* Current Logo Preview */}
+                  {logoPreview && (
+                    <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                      <p className="text-white/60 text-sm mb-2">Current Logo:</p>
+                      <img
+                        src={logoPreview.startsWith('data:') ? logoPreview : `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}${logoPreview}`}
+                        alt="Tenant Logo"
+                        className="max-h-24 max-w-full object-contain bg-white/10 p-2 rounded"
+                      />
+                    </div>
+                  )}
+
+                  {/* File Upload */}
+                  <div>
+                    <label className="block text-white/60 text-sm mb-2">Upload New Logo</label>
+                    <div className="flex items-center gap-3">
+                      <label className="flex-1 flex items-center gap-2 px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg cursor-pointer hover:border-[#FFA317]/50 transition-colors">
+                        <svg className="w-5 h-5 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                        <span className="text-white/50 text-sm truncate">
+                          {logoFile ? logoFile.name : 'Choose logo file...'}
+                        </span>
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept="image/png,image/jpeg,image/jpg,image/svg+xml"
+                          onChange={handleLogoFileSelect}
+                        />
+                      </label>
+                      {logoFile && (
+                        <button
+                          onClick={handleUploadLogo}
+                          disabled={uploadingLogo}
+                          className="px-4 py-2.5 bg-[#FFA317] text-black font-bold rounded-lg hover:bg-white disabled:opacity-50 transition-colors"
+                        >
+                          {uploadingLogo ? 'Uploading...' : 'Upload'}
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-white/40 text-xs mt-1">Accepts PNG, JPG, SVG (max 5MB). Will appear on PDF report cover page.</p>
                   </div>
                 </div>
               </div>
