@@ -76,6 +76,11 @@ export const downloadPentestReport = async (jobId) => {
   return response.data; // This will be a Blob
 };
 
+export const finalizePentest = async (jobId) => {
+  const response = await client.post(`/inference/${jobId}/finalize`);
+  return response.data;
+};
+
 export const checkSystemStatus = async () => {
     // Just check the jobs endpoint as a health check
     return getJobs();
