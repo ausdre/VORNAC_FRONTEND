@@ -34,7 +34,9 @@ export const useAdminAuthStore = create(
 
         // Validate token
         if (isTokenExpired(accessToken)) {
-          console.error('[Admin Auth] Token is expired');
+          const error = 'Token is expired';
+          console.error('[Admin Auth]', error);
+          alert('[DEBUG] ' + error);
           return false;
         }
 
@@ -42,16 +44,22 @@ export const useAdminAuthStore = create(
         console.log('[Admin Auth] Extracted user from token:', user);
 
         if (!user) {
-          console.error('[Admin Auth] Failed to extract user from token');
+          const error = 'Failed to extract user from token';
+          console.error('[Admin Auth]', error);
+          alert('[DEBUG] ' + error);
           return false;
         }
 
         if (user.role !== 'super_admin') {
-          console.error('[Admin Auth] Invalid role:', user.role, '(expected: super_admin)');
+          const error = `Invalid role: "${user.role}" (expected: "super_admin")`;
+          console.error('[Admin Auth]', error);
+          alert('[DEBUG] ' + error);
           return false;
         }
 
         console.log('[Admin Auth] Token validation successful, setting authenticated state');
+        alert('[DEBUG] Token validation successful! Authenticating...');
+
         set({
           isAuthenticated: true,
           accessToken,
