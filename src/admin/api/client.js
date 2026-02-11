@@ -18,13 +18,8 @@ const adminClient = axios.create({
 adminClient.interceptors.request.use(
   (config) => {
     const token = useAdminAuthStore.getState().accessToken;
-    console.log('[Admin API] Request to:', config.url);
-    console.log('[Admin API] Token:', token ? token.substring(0, 50) + '...' : 'MISSING');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-      console.log('[Admin API] Authorization header set');
-    } else {
-      alert('[DEBUG] API request without token! URL: ' + config.url);
     }
     return config;
   },
@@ -37,9 +32,7 @@ adminClient.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401 || error.response?.status === 403) {
       // Unauthorized or forbidden - logout
-      const url = error.config?.url || 'unknown';
-      alert(`[DEBUG] ${error.response?.status} error on ${url} - Logging out!`);
-      console.error('[Admin API] Auth error:', error.response?.status, 'URL:', url);
+      console.error('[Admin API] Auth error:', error.response?.status, 'URL:', error.config?.url);
       useAdminAuthStore.getState().logout();
       window.location.href = '/admin/login';
     }

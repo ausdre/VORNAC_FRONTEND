@@ -30,35 +30,22 @@ export const useAdminAuthStore = create(
 
       // Step 2: TOTP verification (complete authentication)
       loginStep2: (accessToken) => {
-        console.log('[Admin Auth] loginStep2 called with token');
-
         // Validate token
         if (isTokenExpired(accessToken)) {
-          const error = 'Token is expired';
-          console.error('[Admin Auth]', error);
-          alert('[DEBUG] ' + error);
+          console.error('[Admin Auth] Token is expired');
           return false;
         }
 
         const user = extractUserFromToken(accessToken);
-        console.log('[Admin Auth] Extracted user from token:', user);
-
         if (!user) {
-          const error = 'Failed to extract user from token';
-          console.error('[Admin Auth]', error);
-          alert('[DEBUG] ' + error);
+          console.error('[Admin Auth] Failed to extract user from token');
           return false;
         }
 
         if (user.role !== 'super_admin') {
-          const error = `Invalid role: "${user.role}" (expected: "super_admin")`;
-          console.error('[Admin Auth]', error);
-          alert('[DEBUG] ' + error);
+          console.error('[Admin Auth] Invalid role:', user.role, '(expected: super_admin)');
           return false;
         }
-
-        console.log('[Admin Auth] Token validation successful, setting authenticated state');
-        alert('[DEBUG] Token validation successful! Authenticating...');
 
         set({
           isAuthenticated: true,
@@ -68,7 +55,6 @@ export const useAdminAuthStore = create(
           user
         });
 
-        console.log('[Admin Auth] Authentication complete');
         return true;
       },
 
