@@ -18,9 +18,11 @@ const adminClient = axios.create({
 adminClient.interceptors.request.use(
   (config) => {
     const token = useAdminAuthStore.getState().accessToken;
-    console.log('[Admin API] Request to:', config.url, 'Token:', token ? 'EXISTS' : 'MISSING');
+    console.log('[Admin API] Request to:', config.url);
+    console.log('[Admin API] Token:', token ? token.substring(0, 50) + '...' : 'MISSING');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+      console.log('[Admin API] Authorization header set');
     } else {
       alert('[DEBUG] API request without token! URL: ' + config.url);
     }
