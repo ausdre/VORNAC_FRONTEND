@@ -54,6 +54,9 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
     annual_arr: tenant.annual_arr || ''
   });
 
+  // Contract end date visibility toggle
+  const [hasContractEndDate, setHasContractEndDate] = useState(!!tenant.contract_end_date);
+
   // Logo upload state
   const [logoFile, setLogoFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState(tenant.logo_url || null);
@@ -760,7 +763,7 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
 
               <div className="border-t border-white/10 pt-4">
                 <h4 className="text-white font-bold mb-4">Contract Details</h4>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-4">
                   <div>
                     <label className="block text-white/60 text-sm mb-2">Pentest Limit (per year)</label>
                     <input
@@ -772,15 +775,34 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
                     />
                     <p className="text-white/40 text-xs mt-1">Leave blank for unlimited</p>
                   </div>
+
                   <div>
-                    <label className="block text-white/60 text-sm mb-2">Contract End Date</label>
-                    <input
-                      type="date"
-                      value={tenantData.contract_end_date}
-                      onChange={(e) => setTenantData({ ...tenantData, contract_end_date: e.target.value })}
-                      className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white"
-                    />
-                    <p className="text-white/40 text-xs mt-1">Leave blank for unlimited</p>
+                    <label className="flex items-center text-white cursor-pointer mb-3">
+                      <input
+                        type="checkbox"
+                        checked={hasContractEndDate}
+                        onChange={(e) => {
+                          setHasContractEndDate(e.target.checked);
+                          if (!e.target.checked) {
+                            setTenantData({ ...tenantData, contract_end_date: '' });
+                          }
+                        }}
+                        className="mr-2 w-4 h-4"
+                      />
+                      <span>Set Contract End Date</span>
+                    </label>
+
+                    {hasContractEndDate && (
+                      <>
+                        <input
+                          type="date"
+                          value={tenantData.contract_end_date}
+                          onChange={(e) => setTenantData({ ...tenantData, contract_end_date: e.target.value })}
+                          className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white"
+                        />
+                        <p className="text-white/40 text-xs mt-1">Specify when the contract expires</p>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

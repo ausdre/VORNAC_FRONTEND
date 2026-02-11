@@ -8,7 +8,7 @@ import { useAdminAuthStore } from '../stores/adminAuthStore';
 import { useToastStore } from '../../stores/toastStore';
 
 const AdminSettingsPage = () => {
-  const { adminToken, adminUser } = useAdminAuthStore();
+  const { accessToken, user } = useAdminAuthStore();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -49,7 +49,7 @@ const AdminSettingsPage = () => {
     setLoading(true);
 
     try {
-      await changePassword(currentPassword, newPassword, adminToken);
+      await changePassword(currentPassword, newPassword, accessToken);
 
       // Clear form
       setCurrentPassword('');
@@ -134,7 +134,7 @@ const AdminSettingsPage = () => {
               <div>
                 <label className="block text-white/40 text-xs uppercase tracking-wider mb-2">Email</label>
                 <div className="bg-[#02030a] border border-white/10 rounded-lg py-3 px-4 text-white font-mono">
-                  {adminUser?.email || 'N/A'}
+                  {user?.email || 'N/A'}
                 </div>
               </div>
 
@@ -153,8 +153,8 @@ const AdminSettingsPage = () => {
               <div>
                 <label className="block text-white/40 text-xs uppercase tracking-wider mb-2">Name</label>
                 <div className="bg-[#02030a] border border-white/10 rounded-lg py-3 px-4 text-white">
-                  {adminUser?.first_name && adminUser?.last_name
-                    ? `${adminUser.first_name} ${adminUser.last_name}`
+                  {user?.first_name && user?.last_name
+                    ? `${user.first_name} ${user.last_name}`
                     : 'N/A'}
                 </div>
               </div>

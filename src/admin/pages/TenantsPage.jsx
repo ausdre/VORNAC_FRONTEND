@@ -490,6 +490,7 @@ const TenantsPage = () => {
                 >
                   Name <SortIcon column="name" />
                 </th>
+                <th className="text-left p-4 text-white/60 text-sm font-bold">Logo</th>
                 <th
                   onClick={() => handleSort('status')}
                   className="text-left p-4 text-white/60 text-sm font-bold cursor-pointer hover:text-white transition-colors"
@@ -533,6 +534,19 @@ const TenantsPage = () => {
                   className={`hover:bg-white/5 cursor-pointer transition-colors ${!tenant.is_active ? 'opacity-60' : ''}`}
                 >
                   <td className="p-4 font-medium text-white">{tenant.name}</td>
+                  <td className="p-4">
+                    {tenant.logo_url ? (
+                      <img
+                        src={`${import.meta.env.VITE_API_URL}${tenant.logo_url}`}
+                        alt={`${tenant.name} logo`}
+                        className="h-8 w-8 object-contain rounded border border-white/10 bg-white/5"
+                      />
+                    ) : (
+                      <div className="h-8 w-8 rounded border border-white/10 bg-white/5 flex items-center justify-center text-white/20 text-xs">
+                        📷
+                      </div>
+                    )}
+                  </td>
                   <td className="p-4">
                     {tenant.is_active ? (
                       <span className="px-2 py-1 bg-green-500/10 text-green-400 text-xs font-bold rounded">Active</span>
