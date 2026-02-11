@@ -220,8 +220,6 @@ const Results = () => {
         message: `Failed to download report: ${error.response?.data?.detail || error.message}`
       });
     }
-    // You can implement the PDF generator here
-    alert('PDF generation will be implemented. Check console for complete JSON data.');
   };
 
   // Target List View
