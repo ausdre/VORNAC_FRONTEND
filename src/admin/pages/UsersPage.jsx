@@ -13,6 +13,7 @@ import {
 } from '../api/users';
 import { listTenants } from '../api/tenants';
 import UserDetailModal from '../components/UserDetailModal';
+import { useToastStore } from '../../stores/toastStore';
 
 const UsersPage = () => {
   const [users, setUsers] = useState([]);
@@ -138,8 +139,10 @@ const UsersPage = () => {
         password: ''
       });
       fetchUsers();
+      useToastStore.getState().success('User created successfully');
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to create user');
+      useToastStore.getState().error('Failed to create user');
     }
   };
 

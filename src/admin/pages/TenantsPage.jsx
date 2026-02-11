@@ -14,6 +14,7 @@ import {
 } from '../api/tenants';
 import adminClient from '../api/client';
 import TenantDetailModal from '../components/TenantDetailModal';
+import { useToastStore } from '../../stores/toastStore';
 
 const TenantsPage = () => {
   const [tenants, setTenants] = useState([]);
@@ -187,8 +188,10 @@ const TenantsPage = () => {
       resetFormData();
       fetchTenants();
       fetchConfigurations();
+      useToastStore.getState().success('Tenant created successfully');
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to create tenant');
+      useToastStore.getState().error('Failed to create tenant');
     }
   };
 
@@ -230,8 +233,10 @@ const TenantsPage = () => {
       setSelectedTenant(null);
       setFormData({ name: '', pentest_limit_per_year: '', contract_end_date: '', annual_arr: '' });
       fetchTenants();
+      useToastStore.getState().success('Tenant updated successfully');
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to update tenant');
+      useToastStore.getState().error('Failed to update tenant');
     }
   };
 
@@ -258,9 +263,9 @@ const TenantsPage = () => {
       setSuspendReason('');
       setSelectedTenantForSuspend(null);
       fetchTenants();
-      alert(`Tenant "${selectedTenantForSuspend.name}" has been suspended`);
+      useToastStore.getState().success(`Tenant "${selectedTenantForSuspend.name}" has been suspended`);
     } catch (err) {
-      alert('Failed to suspend tenant');
+      useToastStore.getState().error('Failed to suspend tenant');
     }
   };
 
@@ -271,9 +276,9 @@ const TenantsPage = () => {
     try {
       await unsuspendTenant(tenant.id);
       fetchTenants();
-      alert(`Tenant "${tenant.name}" has been reactivated`);
+      useToastStore.getState().success(`Tenant "${tenant.name}" has been reactivated`);
     } catch (err) {
-      alert('Failed to unsuspend tenant');
+      useToastStore.getState().error('Failed to unsuspend tenant');
     }
   };
 
@@ -290,9 +295,9 @@ const TenantsPage = () => {
     try {
       await regenerateTenantAPIKey(tenant.id);
       fetchTenants();
-      alert('API key regenerated successfully');
+      useToastStore.getState().success('API key regenerated successfully');
     } catch (err) {
-      alert('Failed to regenerate API key');
+      useToastStore.getState().error('Failed to regenerate API key');
     }
   };
 

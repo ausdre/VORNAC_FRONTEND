@@ -11,6 +11,7 @@ import {
   deleteTenant
 } from '../api/tenants';
 import { listUsers, createUser, updateUser } from '../api/users';
+import { useToastStore } from '../../stores/toastStore';
 
 export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
   const [activeTab, setActiveTab] = useState('overview');
@@ -278,8 +279,10 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
 
       await adminClient.put(`/tenants/${tenant.id}`, payload);
       onUpdate();
+      useToastStore.getState().success('Tenant updated successfully');
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to update tenant');
+      useToastStore.getState().error('Failed to update tenant');
     } finally {
       setLoading(false);
     }
@@ -330,9 +333,10 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
       setLogoPreview(response.data.logo_url);
       setLogoFile(null);
       onUpdate();
-      alert('Logo uploaded successfully!');
+      useToastStore.getState().success('Logo uploaded successfully');
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to upload logo');
+      useToastStore.getState().error('Failed to upload logo');
     } finally {
       setUploadingLogo(false);
     }
@@ -355,9 +359,10 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
         setSsoConfig(response.data);
       }
       loadConfigurations();
-      alert('SSO configuration saved successfully!');
+      useToastStore.getState().success('SSO configuration saved successfully');
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to configure SSO');
+      useToastStore.getState().error('Failed to configure SSO');
     } finally {
       setLoading(false);
     }
@@ -368,8 +373,9 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
     try {
       await adminClient.put(`/sso/configurations/${ssoConfig.id}/enable`);
       loadConfigurations();
+      useToastStore.getState().success('SSO enabled successfully');
     } catch (err) {
-      alert('Failed to enable SSO: ' + err.message);
+      useToastStore.getState().error('Failed to enable SSO: ' + err.message);
     }
   };
 
@@ -378,8 +384,9 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
     try {
       await adminClient.put(`/sso/configurations/${ssoConfig.id}/disable`);
       loadConfigurations();
+      useToastStore.getState().success('SSO disabled successfully');
     } catch (err) {
-      alert('Failed to disable SSO: ' + err.message);
+      useToastStore.getState().error('Failed to disable SSO: ' + err.message);
     }
   };
 
@@ -435,9 +442,10 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
         setKmsConfig(response.data);
       }
       loadConfigurations();
-      alert('KMS configuration saved successfully!');
+      useToastStore.getState().success('KMS configuration saved successfully');
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to configure KMS');
+      useToastStore.getState().error('Failed to configure KMS');
     } finally {
       setLoading(false);
     }
@@ -462,8 +470,9 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
     try {
       await adminClient.put(`/kms/configurations/${kmsConfig.id}/enable`);
       loadConfigurations();
+      useToastStore.getState().success('KMS enabled successfully');
     } catch (err) {
-      alert('Failed to enable KMS: ' + err.message);
+      useToastStore.getState().error('Failed to enable KMS: ' + err.message);
     }
   };
 

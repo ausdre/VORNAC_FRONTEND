@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import adminClient from '../api/client';
+import { useToastStore } from '../../stores/toastStore';
 
 export default function SSOConfigPage() {
   const [configs, setConfigs] = useState([]);
@@ -53,8 +54,10 @@ export default function SSOConfigPage() {
         jit_provisioning: true
       });
       loadData();
+      useToastStore.getState().success('SSO configuration created successfully');
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to create SSO configuration');
+      useToastStore.getState().error('Failed to create SSO configuration');
     }
   };
 
@@ -62,8 +65,9 @@ export default function SSOConfigPage() {
     try {
       await adminClient.put(`/sso/configurations/${configId}/enable`);
       loadData();
+      useToastStore.getState().success('SSO enabled successfully');
     } catch (err) {
-      alert('Failed to enable SSO: ' + (err.response?.data?.detail || err.message));
+      useToastStore.getState().error('Failed to enable SSO: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -71,8 +75,9 @@ export default function SSOConfigPage() {
     try {
       await adminClient.put(`/sso/configurations/${configId}/disable`);
       loadData();
+      useToastStore.getState().success('SSO disabled successfully');
     } catch (err) {
-      alert('Failed to disable SSO: ' + (err.response?.data?.detail || err.message));
+      useToastStore.getState().error('Failed to disable SSO: ' + (err.response?.data?.detail || err.message));
     }
   };
 

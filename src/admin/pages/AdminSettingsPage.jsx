@@ -5,6 +5,7 @@
 import React, { useState } from 'react';
 import { changePassword } from '../api/auth';
 import { useAdminAuthStore } from '../stores/adminAuthStore';
+import { useToastStore } from '../../stores/toastStore';
 
 const AdminSettingsPage = () => {
   const { adminToken, adminUser } = useAdminAuthStore();
@@ -60,6 +61,7 @@ const AdminSettingsPage = () => {
         title: 'Password Changed',
         message: 'Your password has been successfully updated'
       });
+      useToastStore.getState().success('Password changed successfully');
     } catch (error) {
       console.error('Failed to change password:', error);
 
@@ -76,6 +78,7 @@ const AdminSettingsPage = () => {
         title: 'Password Change Failed',
         message: errorMessage
       });
+      useToastStore.getState().error('Failed to change password');
     } finally {
       setLoading(false);
     }

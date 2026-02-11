@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import adminClient from '../api/client';
+import { useToastStore } from '../../stores/toastStore';
 
 export default function KMSConfigPage() {
   const [configs, setConfigs] = useState([]);
@@ -105,8 +106,10 @@ export default function KMSConfigPage() {
       setShowModal(false);
       resetForm();
       loadData();
+      useToastStore.getState().success('KMS configuration created successfully');
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to create KMS configuration');
+      useToastStore.getState().error('Failed to create KMS configuration');
     }
   };
 
@@ -156,8 +159,9 @@ export default function KMSConfigPage() {
     try {
       await adminClient.put(`/kms/configurations/${configId}/enable`);
       loadData();
+      useToastStore.getState().success('KMS enabled successfully');
     } catch (err) {
-      alert('Failed to enable KMS: ' + (err.response?.data?.detail || err.message));
+      useToastStore.getState().error('Failed to enable KMS: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -165,8 +169,9 @@ export default function KMSConfigPage() {
     try {
       await adminClient.put(`/kms/configurations/${configId}/disable`);
       loadData();
+      useToastStore.getState().success('KMS disabled successfully');
     } catch (err) {
-      alert('Failed to disable KMS: ' + (err.response?.data?.detail || err.message));
+      useToastStore.getState().error('Failed to disable KMS: ' + (err.response?.data?.detail || err.message));
     }
   };
 
