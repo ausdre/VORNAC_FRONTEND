@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { changePassword, client } from '../api/client';
 import { useAuthStore } from '../stores/authStore';
 
@@ -17,14 +17,7 @@ const Settings = () => {
 
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
-  // Load notification settings for admins
-  useEffect(() => {
-    if (isAdmin) {
-      loadNotificationSettings();
-    }
-  }, [isAdmin]);
-
-  const loadNotificationSettings = async () => {
+  const loadNotificationSettings = useCallback(async () => {
     setNotificationsLoading(true);
     try {
       const response = await client.get('/settings/notifications');
@@ -34,7 +27,14 @@ const Settings = () => {
     } finally {
       setNotificationsLoading(false);
     }
-  };
+  }, []);
+
+  // Load notification settings for admins
+  useEffect(() => {
+    if (isAdmin) {
+      loadNotificationSettings();
+    }
+  }, [isAdmin, loadNotificationSettings]);
 
   const handleToggleNotifications = async (enabled) => {
     setSavingNotifications(true);
