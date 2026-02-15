@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { changePassword, client } from '../api/client';
+import client, { changePassword } from '../api/client';
 import { useAuthStore } from '../stores/authStore';
 
 const Settings = () => {
