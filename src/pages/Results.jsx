@@ -892,6 +892,14 @@ const Results = () => {
                                             </div>
                                           )}
 
+                                          {/* Proof of Concept Section */}
+                                          {finding.poc && (
+                                            <div className={`mb-4 bg-white/5 p-3 rounded border border-white/5 ${isMitigated ? 'opacity-60' : ''}`}>
+                                              <h6 className={`text-purple-400 text-xs font-bold uppercase mb-1 tracking-wider ${isMitigated ? 'line-through' : ''}`}>Proof of Concept</h6>
+                                              <pre className={`text-white/70 text-sm font-mono overflow-x-auto ${isMitigated ? 'line-through' : ''}`}>{finding.poc}</pre>
+                                            </div>
+                                          )}
+
                                           {/* Recommendation Section */}
                                           {Array.isArray(finding.recommendation) && finding.recommendation.length > 0 && (
                                             <div className={`mb-4 ${isMitigated ? 'opacity-60' : ''}`}>
