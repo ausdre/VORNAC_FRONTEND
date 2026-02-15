@@ -900,8 +900,14 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
                         Notify admins when pentests complete
                       </span>
                       <p className="text-white/40 text-xs mt-1">
-                        When enabled, all active admin users of this tenant will receive an email notification when a pentest finishes.
+                        When enabled, <strong className="text-white/60">ALL active admin users</strong> of this tenant will receive an email notification when a pentest finishes.
                         The email will NOT contain vulnerability details, only completion info.
+                      </p>
+                      <p className="text-amber-400/80 text-xs mt-2 flex items-start gap-1">
+                        <svg className="w-3 h-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>This setting can also be changed by tenant admins in their Settings page.</span>
                       </p>
                     </div>
                   </label>

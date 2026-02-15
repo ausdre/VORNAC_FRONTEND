@@ -1,15 +1,68 @@
-import React, { useState } from 'react';
-import { changePassword } from '../api/client';
+import React, { useState, useEffect } from 'react';
+import { changePassword, client } from '../api/client';
+import { useAuthStore } from '../stores/authStore';
 
 const Settings = () => {
+  const { user } = useAuthStore();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [modalState, setModalState] = useState(null); // { type: 'success'|'error', message }
   const [loading, setLoading] = useState(false);
 
-  // Get user info from localStorage or token
-  const userEmail = 'admin@companya.com'; // In a real app, this would come from JWT or API
+  // Notification settings (only for admins)
+  const [notificationSettings, setNotificationSettings] = useState(null);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [savingNotifications, setSavingNotifications] = useState(false);
+
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+
+  // Load notification settings for admins
+  useEffect(() => {
+    if (isAdmin) {
+      loadNotificationSettings();
+    }
+  }, [isAdmin]);
+
+  const loadNotificationSettings = async () => {
+    setNotificationsLoading(true);
+    try {
+      const response = await client.get('/settings/notifications');
+      setNotificationSettings(response.data);
+    } catch (error) {
+      console.error('Failed to load notification settings:', error);
+    } finally {
+      setNotificationsLoading(false);
+    }
+  };
+
+  const handleToggleNotifications = async (enabled) => {
+    setSavingNotifications(true);
+    try {
+      const response = await client.put('/settings/notifications', {
+        notify_on_pentest_completion: enabled
+      });
+      setNotificationSettings(response.data);
+      setModalState({
+        type: 'success',
+        title: 'Settings Updated',
+        message: enabled
+          ? 'All admins will now receive email notifications when pentests complete'
+          : 'Email notifications for pentest completion have been disabled'
+      });
+    } catch (error) {
+      console.error('Failed to update notification settings:', error);
+      setModalState({
+        type: 'error',
+        title: 'Update Failed',
+        message: error.response?.data?.detail || 'Failed to update notification settings'
+      });
+      // Reload settings to ensure UI is in sync
+      loadNotificationSettings();
+    } finally {
+      setSavingNotifications(false);
+    }
+  };
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
@@ -128,25 +181,79 @@ const Settings = () => {
               <div>
                 <label className="block text-white/40 text-xs uppercase tracking-wider mb-2">Email</label>
                 <div className="bg-[#02030a] border border-white/10 rounded-lg py-3 px-4 text-white font-mono">
-                  {userEmail}
+                  {user?.email || 'N/A'}
                 </div>
               </div>
 
               <div>
                 <label className="block text-white/40 text-xs uppercase tracking-wider mb-2">Role</label>
-                <div className="bg-[#02030a] border border-white/10 rounded-lg py-3 px-4 text-white">
-                  Administrator
+                <div className="bg-[#02030a] border border-white/10 rounded-lg py-3 px-4 text-white capitalize">
+                  {user?.role || 'N/A'}
                 </div>
               </div>
 
-              <div>
-                <label className="block text-white/40 text-xs uppercase tracking-wider mb-2">Organization</label>
-                <div className="bg-[#02030a] border border-white/10 rounded-lg py-3 px-4 text-white">
-                  Company A
+              {user?.tenant_name && (
+                <div>
+                  <label className="block text-white/40 text-xs uppercase tracking-wider mb-2">Organization</label>
+                  <div className="bg-[#02030a] border border-white/10 rounded-lg py-3 px-4 text-white">
+                    {user.tenant_name}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
+
+          {/* Email Notifications Section (Admin Only) */}
+          {isAdmin && (
+            <div className="bg-[#0a0b14] border border-white/10 rounded-xl p-8 shadow-lg">
+              <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-3">
+                <svg className="w-6 h-6 text-[#FFA317]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                Email Notifications
+              </h2>
+
+              {notificationsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FFA317]"></div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-start gap-4 p-4 bg-[#02030a] border border-white/10 rounded-lg">
+                    <input
+                      type="checkbox"
+                      id="notify-pentest-completion"
+                      checked={notificationSettings?.notify_on_pentest_completion || false}
+                      onChange={(e) => handleToggleNotifications(e.target.checked)}
+                      disabled={savingNotifications}
+                      className="mt-1 w-5 h-5 accent-[#FFA317] cursor-pointer disabled:opacity-50"
+                    />
+                    <div className="flex-1">
+                      <label
+                        htmlFor="notify-pentest-completion"
+                        className="text-white font-medium cursor-pointer"
+                      >
+                        Notify when pentests complete
+                      </label>
+                      <p className="text-white/60 text-sm mt-1">
+                        When enabled, <strong className="text-[#FFA317]">ALL admin users</strong> of {notificationSettings?.tenant_name || 'your organization'} will receive an email notification when a pentest finishes.
+                      </p>
+                      <p className="text-white/40 text-xs mt-2">
+                        ℹ️ The email will NOT contain vulnerability details, only completion information and a link to view results.
+                      </p>
+                    </div>
+                  </div>
+
+                  {savingNotifications && (
+                    <div className="flex items-center gap-2 text-[#FFA317] text-sm">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#FFA317]"></div>
+                      <span>Saving...</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Change Password Section */}
           <div className="bg-[#0a0b14] border border-white/10 rounded-xl p-8 shadow-lg">
