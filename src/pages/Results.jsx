@@ -98,11 +98,18 @@ const Results = () => {
       // Aggregate findings from completed pentests
       if (job.status === 'COMPLETED' && job.result_data?.summary?.severity_breakdown) {
         const breakdown = job.result_data.summary.severity_breakdown;
-        targetMap[targetUrl].findings.critical += breakdown.critical || 0;
-        targetMap[targetUrl].findings.high += breakdown.high || 0;
-        targetMap[targetUrl].findings.medium += breakdown.medium || 0;
-        targetMap[targetUrl].findings.low += breakdown.low || 0;
-        targetMap[targetUrl].findings.informational += breakdown.informational || 0;
+        // Handle both old format (numbers) and new format (objects with open/mitigated)
+        const getSeverityCount = (value) => {
+          if (typeof value === 'number') return value;
+          if (typeof value === 'object' && value !== null) return (value.open || 0) + (value.mitigated || 0);
+          return 0;
+        };
+
+        targetMap[targetUrl].findings.critical += getSeverityCount(breakdown.critical);
+        targetMap[targetUrl].findings.high += getSeverityCount(breakdown.high);
+        targetMap[targetUrl].findings.medium += getSeverityCount(breakdown.medium);
+        targetMap[targetUrl].findings.low += getSeverityCount(breakdown.low);
+        targetMap[targetUrl].findings.informational += getSeverityCount(breakdown.informational);
         targetMap[targetUrl].findings.total += job.result_data.summary.total_findings || 0;
       }
     });
@@ -199,9 +206,17 @@ const Results = () => {
     const pentestName = pentest.result_data?.metadata?.report_id || `Pentest ${pentest.id}`;
     const isFinal = pentest.result_data?.metadata?.is_final || false;
     const severityBreakdown = pentest.result_data?.summary?.severity_breakdown || {};
-    const critical = severityBreakdown.critical || 0;
-    const high = severityBreakdown.high || 0;
-    const medium = severityBreakdown.medium || 0;
+
+    // Handle both old format (numbers) and new format (objects with open/mitigated)
+    const getOpenCount = (value) => {
+      if (typeof value === 'number') return value;
+      if (typeof value === 'object' && value !== null) return value.open || 0;
+      return 0;
+    };
+
+    const critical = getOpenCount(severityBreakdown.critical);
+    const high = getOpenCount(severityBreakdown.high);
+    const medium = getOpenCount(severityBreakdown.medium);
 
     // Check if already finalized
     if (isFinal) {
@@ -796,16 +811,36 @@ const Results = () => {
                                     <div className="bg-white/5 rounded-lg p-6 border border-white/5">
                                       <h4 className="text-white/60 text-xs uppercase tracking-widest mb-4">Severity Breakdown</h4>
                                       <div className="space-y-3">
-                                        {report.summary.severity_breakdown ? Object.entries(report.summary.severity_breakdown).map(([level, count]) => (
-                                          count > 0 && (
+                                        {report.summary.severity_breakdown ? Object.entries(report.summary.severity_breakdown).map(([level, value]) => {
+                                          // Handle both old format (numbers) and new format (objects with open/mitigated)
+                                          const isObject = typeof value === 'object' && value !== null;
+                                          const totalCount = isObject ? (value.open || 0) + (value.mitigated || 0) : (value || 0);
+                                          const openCount = isObject ? (value.open || 0) : (value || 0);
+                                          const mitigatedCount = isObject ? (value.mitigated || 0) : 0;
+
+                                          return totalCount > 0 && (
                                             <div key={level} className="flex justify-between items-center">
                                               <span className="text-white/80 capitalize text-sm">{level}</span>
-                                              <span className={`px-2 py-0.5 rounded text-xs font-bold border ${getSeverityColor(level)}`}>
-                                                {count}
-                                              </span>
+                                              <div className="flex items-center gap-2">
+                                                {mitigatedCount > 0 && (
+                                                  <span className="px-2 py-0.5 rounded text-xs font-bold border border-green-500/30 bg-green-500/10 text-green-400 line-through">
+                                                    {mitigatedCount}
+                                                  </span>
+                                                )}
+                                                {openCount > 0 && (
+                                                  <span className={`px-2 py-0.5 rounded text-xs font-bold border ${getSeverityColor(level)}`}>
+                                                    {openCount}
+                                                  </span>
+                                                )}
+                                                {mitigatedCount === 0 && openCount === 0 && (
+                                                  <span className={`px-2 py-0.5 rounded text-xs font-bold border ${getSeverityColor(level)}`}>
+                                                    {totalCount}
+                                                  </span>
+                                                )}
+                                              </div>
                                             </div>
-                                          )
-                                        )) : (
+                                          );
+                                        }) : (
                                           <p className="text-white/30 text-xs">No breakdown available</p>
                                         )}
                                       </div>
@@ -816,32 +851,60 @@ const Results = () => {
                                   <div>
                                     <h4 className="text-[#FFA317] text-xs font-bold uppercase tracking-widest mb-6">Detailed Findings</h4>
                                     <div className="space-y-4">
-                                      {report.findings.map((finding, index) => (
-                                        <div key={finding.id || index} className="bg-[#0f111a] border border-white/5 rounded-lg p-6 hover:border-white/10 transition-colors">
-                                          <div className="flex justify-between items-start mb-3">
+                                      {report.findings.map((finding, index) => {
+                                        const isMitigated = finding.status === 'mitigated';
+                                        return (
+                                        <div key={finding.id || index} className={`bg-[#0f111a] border rounded-lg p-6 hover:border-white/10 transition-colors ${isMitigated ? 'border-green-500/30 bg-green-500/5' : 'border-white/5'}`}>
+                                          {/* Mitigated Banner */}
+                                          {isMitigated && (
+                                            <div className="mb-4 bg-gradient-to-r from-green-500 to-green-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-[0_0_15px_rgba(34,197,94,0.3)]">
+                                              <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center">
+                                                <svg className="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3">
+                                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                </svg>
+                                              </div>
+                                              <span className="font-bold text-sm">MITIGATED</span>
+                                              {finding.mitigated_in_version && (
+                                                <span className="text-sm">in Version {finding.mitigated_in_version}</span>
+                                              )}
+                                              {finding.mitigated_date && (
+                                                <span className="text-xs opacity-80">({finding.mitigated_date})</span>
+                                              )}
+                                            </div>
+                                          )}
+
+                                          <div className={`flex justify-between items-start mb-3 ${isMitigated ? 'opacity-60' : ''}`}>
                                             <div className="flex items-center gap-4">
-                                              <span className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wide border ${getSeverityColor(finding.severity)}`}>
+                                              <span className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wide border ${getSeverityColor(finding.severity)} ${isMitigated ? 'line-through opacity-50' : ''}`}>
                                                 {finding.severity || 'UNKNOWN'}
                                               </span>
-                                              <h5 className="text-white font-medium text-lg">{finding.title || 'Untitled Finding'}</h5>
+                                              <h5 className={`text-white font-medium text-lg ${isMitigated ? 'line-through' : ''}`}>{finding.title || 'Untitled Finding'}</h5>
                                             </div>
-                                            {finding.id && <span className="text-white/30 text-xs font-mono">{finding.id}</span>}
+                                            {finding.id && <span className={`text-white/30 text-xs font-mono ${isMitigated ? 'line-through' : ''}`}>{finding.id}</span>}
                                           </div>
-                                          <p className="text-white/60 text-sm mb-4 leading-relaxed">{finding.description || 'No description available.'}</p>
+                                          <p className={`text-white/60 text-sm mb-4 leading-relaxed ${isMitigated ? 'line-through opacity-60' : ''}`}>{finding.description || 'No description available.'}</p>
 
                                           {/* Impact Section */}
                                           {finding.impact && (
-                                            <div className="mb-4 bg-white/5 p-3 rounded border border-white/5">
-                                              <h6 className="text-[#FFA317] text-xs font-bold uppercase mb-1 tracking-wider">Business Impact</h6>
-                                              <p className="text-white/70 text-sm">{finding.impact}</p>
+                                            <div className={`mb-4 bg-white/5 p-3 rounded border border-white/5 ${isMitigated ? 'opacity-60' : ''}`}>
+                                              <h6 className={`text-[#FFA317] text-xs font-bold uppercase mb-1 tracking-wider ${isMitigated ? 'line-through' : ''}`}>Business Impact</h6>
+                                              <p className={`text-white/70 text-sm ${isMitigated ? 'line-through' : ''}`}>{finding.impact}</p>
+                                            </div>
+                                          )}
+
+                                          {/* Proof of Concept Section */}
+                                          {finding.poc && (
+                                            <div className={`mb-4 bg-white/5 p-3 rounded border border-white/5 ${isMitigated ? 'opacity-60' : ''}`}>
+                                              <h6 className={`text-purple-400 text-xs font-bold uppercase mb-1 tracking-wider ${isMitigated ? 'line-through' : ''}`}>Proof of Concept</h6>
+                                              <pre className={`text-white/70 text-sm font-mono overflow-x-auto ${isMitigated ? 'line-through' : ''}`}>{finding.poc}</pre>
                                             </div>
                                           )}
 
                                           {/* Recommendation Section */}
                                           {Array.isArray(finding.recommendation) && finding.recommendation.length > 0 && (
-                                            <div className="mb-4">
-                                              <h6 className="text-green-400 text-xs font-bold uppercase mb-2 tracking-wider">Recommendation</h6>
-                                              <ul className="list-disc list-inside text-white/60 text-sm space-y-1">
+                                            <div className={`mb-4 ${isMitigated ? 'opacity-60' : ''}`}>
+                                              <h6 className={`text-green-400 text-xs font-bold uppercase mb-2 tracking-wider ${isMitigated ? 'line-through' : ''}`}>Recommendation</h6>
+                                              <ul className={`list-disc list-inside text-white/60 text-sm space-y-1 ${isMitigated ? 'line-through' : ''}`}>
                                                 {finding.recommendation.map((rec, idx) => (
                                                   <li key={idx}>{rec}</li>
                                                 ))}
@@ -849,14 +912,15 @@ const Results = () => {
                                             </div>
                                           )}
 
-                                          <div className="flex gap-6 text-xs text-white/40 font-mono border-t border-white/5 pt-3">
+                                          <div className={`flex gap-6 text-xs text-white/40 font-mono border-t border-white/5 pt-3 ${isMitigated ? 'line-through opacity-60' : ''}`}>
                                             {finding.cvss_score != null && <span>CVSS: <span className="text-white/70">{finding.cvss_score}</span></span>}
                                             {finding.affected_assets && (
                                               <span>Assets: <span className="text-white/70">{finding.affected_assets.length}</span></span>
                                             )}
                                           </div>
                                         </div>
-                                      ))}
+                                      );
+                                      })}
                                     </div>
                                   </div>
                                 </>

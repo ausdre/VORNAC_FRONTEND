@@ -51,7 +51,8 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
     name: tenant.name || '',
     pentest_limit_per_year: tenant.pentest_limit_per_year || '',
     contract_end_date: tenant.contract_end_date ? tenant.contract_end_date.split('T')[0] : '',
-    annual_arr: tenant.annual_arr || ''
+    annual_arr: tenant.annual_arr || '',
+    notify_on_pentest_completion: tenant.notify_on_pentest_completion || false
   });
 
   // Contract end date visibility toggle
@@ -277,7 +278,8 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
         name: tenantData.name,
         pentest_limit_per_year: tenantData.pentest_limit_per_year === '' ? null : parseInt(tenantData.pentest_limit_per_year),
         contract_end_date: tenantData.contract_end_date === '' ? null : tenantData.contract_end_date,
-        annual_arr: tenantData.annual_arr === '' ? null : parseFloat(tenantData.annual_arr)
+        annual_arr: tenantData.annual_arr === '' ? null : parseFloat(tenantData.annual_arr),
+        notify_on_pentest_completion: tenantData.notify_on_pentest_completion
       };
 
       await adminClient.put(`/tenants/${tenant.id}`, payload);
@@ -879,6 +881,36 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
                     </div>
                     <p className="text-white/40 text-xs mt-1">Accepts PNG, JPG, SVG (max 5MB). Will appear on PDF report cover page.</p>
                   </div>
+                </div>
+              </div>
+
+              {/* Notifications Section */}
+              <div className="border-t border-white/10 pt-4">
+                <h4 className="text-white font-bold mb-4">Notifications</h4>
+                <div className="space-y-3">
+                  <label className="flex items-start gap-3 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={tenantData.notify_on_pentest_completion}
+                      onChange={(e) => setTenantData({ ...tenantData, notify_on_pentest_completion: e.target.checked })}
+                      className="mt-1 w-4 h-4 accent-[#FFA317] cursor-pointer"
+                    />
+                    <div className="flex-1">
+                      <span className="text-white group-hover:text-[#FFA317] transition-colors">
+                        Notify admins when pentests complete
+                      </span>
+                      <p className="text-white/40 text-xs mt-1">
+                        When enabled, <strong className="text-white/60">ALL active admin users</strong> of this tenant will receive an email notification when a pentest finishes.
+                        The email will NOT contain vulnerability details, only completion info.
+                      </p>
+                      <p className="text-amber-400/80 text-xs mt-2 flex items-start gap-1">
+                        <svg className="w-3 h-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>This setting can also be changed by tenant admins in their Settings page.</span>
+                      </p>
+                    </div>
+                  </label>
                 </div>
               </div>
 

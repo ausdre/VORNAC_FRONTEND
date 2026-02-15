@@ -40,23 +40,36 @@ const Dashboard = () => {
           .sort((a, b) => new Date(a.scheduled_for).getTime() - new Date(b.scheduled_for).getTime());
         setNextScheduled(pendingQueue[0] || null);
 
-        // Calculate total findings from completed reports
+        // Calculate total findings from completed reports (ONLY open findings, not mitigated)
         let findingsCount = 0;
         let severityAgg = { critical: 0, high: 0, medium: 0, low: 0, informational: 0 };
 
+        // Helper function to get only OPEN count (not mitigated)
+        const getOpenCount = (value) => {
+          if (typeof value === 'number') return value; // Old format: just a number
+          if (typeof value === 'object' && value !== null) return value.open || 0; // New format: {open: X, mitigated: Y}
+          return 0;
+        };
+
         jobs.forEach(job => {
             if (job.status === 'COMPLETED' && job.result_data?.summary) {
-                findingsCount += job.result_data.summary.total_findings || 0;
-
                 const summary = job.result_data.summary;
+
+                // Count only open findings, not mitigated
+                const openFindings = summary.open_findings != null
+                  ? summary.open_findings
+                  : (summary.total_findings || 0);
+                findingsCount += openFindings;
+
                 if (summary.severity_breakdown) {
                     const breakdown = summary.severity_breakdown;
-                    severityAgg.critical += breakdown.critical || 0;
-                    severityAgg.high += breakdown.high || 0;
-                    severityAgg.medium += breakdown.medium || 0;
-                    severityAgg.low += breakdown.low || 0;
-                    severityAgg.informational += breakdown.informational || 0;
+                    severityAgg.critical += getOpenCount(breakdown.critical);
+                    severityAgg.high += getOpenCount(breakdown.high);
+                    severityAgg.medium += getOpenCount(breakdown.medium);
+                    severityAgg.low += getOpenCount(breakdown.low);
+                    severityAgg.informational += getOpenCount(breakdown.informational);
                 } else {
+                    // Fallback for old format without severity_breakdown
                     severityAgg.critical += summary.critical || 0;
                     severityAgg.high += summary.high || 0;
                     severityAgg.medium += summary.medium || 0;
