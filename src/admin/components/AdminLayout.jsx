@@ -83,6 +83,16 @@ const AdminLayout = ({ children }) => {
                 Audit Logs
               </Link>
               <Link
+                to="/admin/access-logs"
+                className={`font-medium transition-colors ${
+                  isActive('/admin/access-logs')
+                    ? 'text-[#FFA317]'
+                    : 'text-white/60 hover:text-white'
+                }`}
+              >
+                Access Logs
+              </Link>
+              <Link
                 to="/admin/sso"
                 className={`font-medium transition-colors ${
                   isActive('/admin/sso')
