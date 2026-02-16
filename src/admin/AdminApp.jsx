@@ -14,6 +14,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import TenantsPage from './pages/TenantsPage';
 import UsersPage from './pages/UsersPage';
 import AuditLogsPage from './pages/AuditLogsPage';
+import AccessLogsPage from './pages/AccessLogsPage';
 import SSOConfigPage from './pages/SSOConfigPage';
 import KMSConfigPage from './pages/KMSConfigPage';
 import AdminSettingsPage from './pages/AdminSettingsPage';
@@ -72,6 +73,14 @@ const AdminApp = () => {
           element={
             <AdminProtectedRoute>
               <AuditLogsPage />
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/access-logs"
+          element={
+            <AdminProtectedRoute>
+              <AccessLogsPage />
             </AdminProtectedRoute>
           }
         />

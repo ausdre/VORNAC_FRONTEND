@@ -15,6 +15,11 @@ const Settings = () => {
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [savingNotifications, setSavingNotifications] = useState(false);
 
+  // Company information (only for admins)
+  const [companyDescription, setCompanyDescription] = useState('');
+  const [companyLoading, setCompanyLoading] = useState(false);
+  const [savingCompany, setSavingCompany] = useState(false);
+
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
   const loadNotificationSettings = useCallback(async () => {
@@ -22,6 +27,10 @@ const Settings = () => {
     try {
       const response = await client.get('/settings/notifications');
       setNotificationSettings(response.data);
+      // Also extract company_description from the response
+      if (response.data.company_description) {
+        setCompanyDescription(response.data.company_description);
+      }
     } catch (error) {
       console.error('Failed to load notification settings:', error);
     } finally {
@@ -29,12 +38,25 @@ const Settings = () => {
     }
   }, []);
 
-  // Load notification settings for admins
+  const loadCompanyInfo = useCallback(async () => {
+    setCompanyLoading(true);
+    try {
+      const response = await client.get('/settings/company');
+      setCompanyDescription(response.data.company_description || '');
+    } catch (error) {
+      console.error('Failed to load company info:', error);
+    } finally {
+      setCompanyLoading(false);
+    }
+  }, []);
+
+  // Load settings for admins
   useEffect(() => {
     if (isAdmin) {
       loadNotificationSettings();
+      loadCompanyInfo();
     }
-  }, [isAdmin, loadNotificationSettings]);
+  }, [isAdmin, loadNotificationSettings, loadCompanyInfo]);
 
   const handleToggleNotifications = async (enabled) => {
     setSavingNotifications(true);
@@ -61,6 +83,30 @@ const Settings = () => {
       loadNotificationSettings();
     } finally {
       setSavingNotifications(false);
+    }
+  };
+
+  const handleSaveCompanyDescription = async () => {
+    setSavingCompany(true);
+    try {
+      await client.put('/settings/company', {
+        company_description: companyDescription
+      });
+      setModalState({
+        type: 'success',
+        title: 'Company Information Updated',
+        message: 'Company description has been saved and will appear in future pentest reports'
+      });
+    } catch (error) {
+      console.error('Failed to update company info:', error);
+      setModalState({
+        type: 'error',
+        title: 'Update Failed',
+        message: error.response?.data?.detail || 'Failed to update company information'
+      });
+      loadCompanyInfo();
+    } finally {
+      setSavingCompany(false);
     }
   };
 
@@ -202,6 +248,51 @@ const Settings = () => {
               )}
             </div>
           </div>
+
+          {/* Company Information Section (Admin Only) */}
+          {isAdmin && (
+            <div className="bg-[#0a0b14] border border-white/10 rounded-xl p-8 shadow-lg">
+              <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-3">
+                <svg className="w-6 h-6 text-[#FFA317]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+                Company Information
+              </h2>
+
+              {companyLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FFA317]"></div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label htmlFor="company-description" className="block text-white/60 text-sm mb-2">
+                      Company Description
+                    </label>
+                    <textarea
+                      id="company-description"
+                      value={companyDescription}
+                      onChange={(e) => setCompanyDescription(e.target.value)}
+                      placeholder="Enter a brief description of your company. This will appear in the Introduction section of pentest reports..."
+                      rows={6}
+                      className="w-full bg-[#02030a] border border-white/10 rounded-lg py-3 px-4 text-white placeholder:text-white/30 focus:border-[#FFA317] focus:outline-none resize-none"
+                    />
+                    <p className="text-white/40 text-xs mt-2">
+                      This description will be included in Section 2 (Introduction) of all pentest PDF reports for {notificationSettings?.tenant_name || 'your organization'}.
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={handleSaveCompanyDescription}
+                    disabled={savingCompany}
+                    className="px-6 py-3 bg-gradient-to-r from-[#FFA317] to-[#FF8C00] hover:from-[#FF8C00] hover:to-[#FFA317] text-white font-bold rounded-lg shadow-[0_0_20px_rgba(255,163,23,0.3)] hover:shadow-[0_0_30px_rgba(255,163,23,0.5)] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {savingCompany ? 'Saving...' : 'Save Company Description'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Email Notifications Section (Admin Only) */}
           {isAdmin && (

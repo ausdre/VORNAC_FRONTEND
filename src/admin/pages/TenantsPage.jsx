@@ -1061,6 +1061,17 @@ const TenantsPage = () => {
                 />
                 <p className="text-white/30 text-xs mt-1">Used for cost-per-pentest analytics</p>
               </div>
+              <div className="mb-4">
+                <label className="block text-white/60 text-sm mb-2">Company Description</label>
+                <textarea
+                  value={formData.company_description || ''}
+                  onChange={(e) => setFormData({ ...formData, company_description: e.target.value })}
+                  placeholder="Company description for PDF reports..."
+                  rows={4}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder:text-white/40 focus:border-[#FFA317] focus:outline-none resize-none"
+                />
+                <p className="text-white/30 text-xs mt-1">Appears in Section 2 of pentest reports</p>
+              </div>
               <div className="flex gap-3">
                 <button
                   type="button"
