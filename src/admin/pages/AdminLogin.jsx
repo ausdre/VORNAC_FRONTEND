@@ -117,7 +117,7 @@ const AdminLogin = () => {
         {/* Step 1: Credentials */}
         {step === 'credentials' && (
           <div className="bg-[#0a0b14] border border-white/10 rounded-xl p-8">
-            <h2 className="text-xl font-bold mb-6 text-center">Sign In</h2>
+            <h2 className="text-xl font-bold mb-6 text-center text-[#FFA317]">Sign In</h2>
 
             {error && (
               <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded text-red-500 text-sm">
