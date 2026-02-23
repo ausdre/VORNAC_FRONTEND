@@ -34,6 +34,8 @@ const TenantsPage = () => {
     pentest_limit_per_year: '',
     contract_end_date: '',
     annual_arr: '',
+    customer_address: '',
+    company_description: '',
     // Auth configuration
     auth_type: 'totp', // 'totp' or 'sso'
     sso_provider: 'okta',
@@ -201,6 +203,8 @@ const TenantsPage = () => {
       pentest_limit_per_year: '',
       contract_end_date: '',
       annual_arr: '',
+      customer_address: '',
+      company_description: '',
       auth_type: 'totp',
       sso_provider: 'okta',
       sso_idp_entity_id: '',
@@ -226,12 +230,14 @@ const TenantsPage = () => {
         name: formData.name,
         pentest_limit_per_year: formData.pentest_limit_per_year === '' ? null : parseInt(formData.pentest_limit_per_year),
         contract_end_date: formData.contract_end_date === '' ? null : formData.contract_end_date,
-        annual_arr: formData.annual_arr === '' ? null : parseFloat(formData.annual_arr)
+        annual_arr: formData.annual_arr === '' ? null : parseFloat(formData.annual_arr),
+        customer_address: formData.customer_address === '' ? null : formData.customer_address,
+        company_description: formData.company_description === '' ? null : formData.company_description
       };
       await updateTenant(selectedTenant.id, payload);
       setShowEditModal(false);
       setSelectedTenant(null);
-      setFormData({ name: '', pentest_limit_per_year: '', contract_end_date: '', annual_arr: '' });
+      setFormData({ name: '', pentest_limit_per_year: '', contract_end_date: '', annual_arr: '', customer_address: '', company_description: '' });
       fetchTenants();
       useToastStore.getState().success('Tenant updated successfully');
     } catch (err) {
@@ -307,7 +313,9 @@ const TenantsPage = () => {
       name: tenant.name,
       pentest_limit_per_year: tenant.pentest_limit_per_year || '',
       contract_end_date: tenant.contract_end_date ? tenant.contract_end_date.split('T')[0] : '',
-      annual_arr: tenant.annual_arr || ''
+      annual_arr: tenant.annual_arr || '',
+      customer_address: tenant.customer_address || '',
+      company_description: tenant.company_description || ''
     });
     setShowEditModal(true);
   };
@@ -1060,6 +1068,17 @@ const TenantsPage = () => {
                   className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder:text-white/40 focus:border-[#FFA317] focus:outline-none"
                 />
                 <p className="text-white/30 text-xs mt-1">Used for cost-per-pentest analytics</p>
+              </div>
+              <div className="mb-4">
+                <label className="block text-white/60 text-sm mb-2">Customer Address</label>
+                <textarea
+                  value={formData.customer_address || ''}
+                  onChange={(e) => setFormData({ ...formData, customer_address: e.target.value })}
+                  placeholder="Company address for PDF reports..."
+                  rows={3}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder:text-white/40 focus:border-[#FFA317] focus:outline-none resize-none"
+                />
+                <p className="text-white/30 text-xs mt-1">Appears in document owner section of pentest reports</p>
               </div>
               <div className="mb-4">
                 <label className="block text-white/60 text-sm mb-2">Company Description</label>

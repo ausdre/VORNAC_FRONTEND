@@ -52,6 +52,8 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
     pentest_limit_per_year: tenant.pentest_limit_per_year || '',
     contract_end_date: tenant.contract_end_date ? tenant.contract_end_date.split('T')[0] : '',
     annual_arr: tenant.annual_arr || '',
+    customer_address: tenant.customer_address || '',
+    company_description: tenant.company_description || '',
     notify_on_pentest_completion: tenant.notify_on_pentest_completion || false
   });
 
@@ -279,6 +281,8 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
         pentest_limit_per_year: tenantData.pentest_limit_per_year === '' ? null : parseInt(tenantData.pentest_limit_per_year),
         contract_end_date: tenantData.contract_end_date === '' ? null : tenantData.contract_end_date,
         annual_arr: tenantData.annual_arr === '' ? null : parseFloat(tenantData.annual_arr),
+        customer_address: tenantData.customer_address === '' ? null : tenantData.customer_address,
+        company_description: tenantData.company_description === '' ? null : tenantData.company_description,
         notify_on_pentest_completion: tenantData.notify_on_pentest_completion
       };
 
@@ -831,6 +835,35 @@ export default function TenantDetailModal({ tenant, onClose, onUpdate }) {
                         : 'N/A'}
                     </div>
                     <p className="text-white/40 text-xs mt-1">Calculated from ARR / pentests</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* PDF Report Settings */}
+              <div className="border-t border-white/10 pt-4">
+                <h4 className="text-white font-bold mb-4">PDF Report Settings</h4>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-white/60 text-sm mb-2">Customer Address</label>
+                    <textarea
+                      value={tenantData.customer_address}
+                      onChange={(e) => setTenantData({ ...tenantData, customer_address: e.target.value })}
+                      placeholder="Company postal address..."
+                      rows={3}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder:text-white/40 focus:border-[#FFA317] focus:outline-none resize-none"
+                    />
+                    <p className="text-white/40 text-xs mt-1">Appears in document owner section of PDF reports</p>
+                  </div>
+                  <div>
+                    <label className="block text-white/60 text-sm mb-2">Company Description</label>
+                    <textarea
+                      value={tenantData.company_description}
+                      onChange={(e) => setTenantData({ ...tenantData, company_description: e.target.value })}
+                      placeholder="Company description text..."
+                      rows={4}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder:text-white/40 focus:border-[#FFA317] focus:outline-none resize-none"
+                    />
+                    <p className="text-white/40 text-xs mt-1">Appears in Section 2 of pentest reports</p>
                   </div>
                 </div>
               </div>
